@@ -1,0 +1,9 @@
+{
+  "name": "growline-frontend",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Temporary placeholder so the staging static site can build. Replace with the real app.",
+  "scripts": {
+    "build": "node build.js"
+  }
+}

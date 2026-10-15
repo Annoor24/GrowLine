@@ -1,0 +1,10 @@
+{
+  "name": "growline-backend",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Temporary placeholder so the staging web service can start. Replace with the real API.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
