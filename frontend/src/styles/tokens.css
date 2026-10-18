@@ -1,0 +1,33 @@
+/*
+  Design tokens from the Figma "GrowLine Design System v1.0" frame.
+  Tint colours (the *-bg and *-text values) are approximated from the screens
+  and should be checked against Figma Dev Mode.
+*/
+:root {
+  --green-700: #174d38;
+  --green-500: #287d4d;
+  --green-100: #ddf3e4;
+  --canvas: #f8f7f2;
+  --surface: #ffffff;
+  --text: #26332d;
+  --muted: #66776d;
+  --border: #dce5de;
+  --warning: #e9ac42;
+  --danger: #d75a52;
+
+  --warning-bg: #fff0d6;
+  --warning-text: #8a5a00;
+  --danger-bg: #fde7e5;
+  --danger-text: #b3382f;
+  --info-bg: #e4eefb;
+  --info-text: #1f5fa8;
+  --neutral-bg: #eceeec;
+  --neutral-text: #5b6a62;
+  --table-head: #eef3ee;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(23, 77, 56, 0.06);
+
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
