@@ -30,7 +30,7 @@ export function AdminSignIn() {
   }
 
   return (
-    <AuthShell
+    <AuthShell centered
       heading={failed ? "Super Admin · Invalid Credentials" : "Super Admin · Sign In"}
       sub={
         failed
@@ -86,7 +86,7 @@ export function ForgotPassword() {
   }
 
   return (
-    <AuthShell
+    <AuthShell centered
       heading="Super Admin · Forgot Password"
       sub="Request a time-limited password reset link."
       title="Reset your password"
@@ -104,7 +104,7 @@ export function ForgotPassword() {
 export function ResetLinkSent() {
   const navigate = useNavigate();
   return (
-    <AuthShell
+    <AuthShell centered
       heading="Super Admin · Reset Requested"
       sub="Privacy-preserving confirmation state."
       title="Check your inbox"
@@ -132,7 +132,7 @@ export function SetNewPassword() {
   }
 
   return (
-    <AuthShell
+    <AuthShell centered
       heading="Super Admin · Set New Password"
       sub="Password reset form and validation requirements."
       title="Choose a new password"
@@ -163,7 +163,7 @@ export function SetNewPassword() {
 export function SessionExpired() {
   const navigate = useNavigate();
   return (
-    <AuthShell
+    <AuthShell centered
       heading="Super Admin · Session Expired"
       sub="Secure re-authentication without losing context."
       title="Your session has expired"
