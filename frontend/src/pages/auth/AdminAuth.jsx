@@ -32,7 +32,11 @@ export function AdminSignIn() {
   return (
     <AuthShell
       heading={failed ? "Super Admin · Invalid Credentials" : "Super Admin · Sign In"}
-      sub={failed ? "Authentication failure with a clear recovery path." : undefined}
+      sub={
+        failed
+          ? "Authentication failure with a clear recovery path."
+          : "Secure access for authorized GrowLine administrators."
+      }
       title={failed ? "Sign in to GrowLine" : "Welcome back"}
       intro={failed ? "Check your details and try again." : "Sign in to manage GrowLine operations."}
       footer={

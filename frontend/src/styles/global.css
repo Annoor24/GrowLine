@@ -654,6 +654,10 @@ textarea.input {
   margin: 0 auto 28px;
 }
 
+.auth-heading.centered {
+  text-align: center;
+}
+
 .auth-heading h1 {
   font-size: 22px;
   font-weight: 700;

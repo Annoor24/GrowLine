@@ -4,9 +4,16 @@ import AuthShell from "../../layouts/AuthShell.jsx";
 import FormField from "../../components/FormField.jsx";
 import Button from "../../components/Button.jsx";
 import { useAuth } from "../../auth/AuthContext.jsx";
-import { isEmail, passwordMessage } from "../../utils/validate.js";
+import { passwordMessage } from "../../utils/validate.js";
 
 const MIN_PASSWORD = 12;
+
+// MOCK: the real invitation details (name, email, expiry) will come from the API using the link's token.
+const SAMPLE_INVITATION = {
+  firstName: "Fatima",
+  email: "fatima.musa@example.ng",
+  expires: "17 Oct 2026, 14:00 WAT",
+};
 
 // MOCK: any email works; the password "wrong" simulates a failed login.
 export function AgentSignIn() {
@@ -33,6 +40,7 @@ export function AgentSignIn() {
 
   return (
     <AuthShell
+      centered
       heading="Extension Agent · Sign In"
       sub="Existing agents sign in; public self-registration is disabled."
       title="Sign in to your agent account"
@@ -66,6 +74,8 @@ export function InvitationExpired() {
   const navigate = useNavigate();
   return (
     <AuthShell
+      centered
+      showLogo={false}
       heading="Extension Agent · Invitation Expired"
       sub="Expired or previously used activation link."
       title="This invitation is no longer valid"
@@ -82,7 +92,6 @@ export function InvitationExpired() {
 export function AgentActivate() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState({});
@@ -93,7 +102,6 @@ export function AgentActivate() {
   function handleSubmit(event) {
     event.preventDefault();
     const next = {};
-    if (!isEmail(email)) next.email = "Enter the work email your invitation was sent to.";
     if (passwordMessage(password)) next.password = passwordMessage(password);
     if (password !== confirm) next.confirm = "The two passwords do not match.";
     setErrors(next);
@@ -102,23 +110,19 @@ export function AgentActivate() {
 
   return (
     <AuthShell
+      centered
       heading="Extension Agent · Activate Account"
       sub="Invitation-based first-time access."
-      title="Welcome to GrowLine"
-      intro="Your invitation is valid for a limited time."
+      title={`Welcome to GrowLine, ${SAMPLE_INVITATION.firstName}`}
+      intro={`Your invitation is valid until ${SAMPLE_INVITATION.expires}.`}
       footer="Activation links can only be used once."
     >
       <form className="stack" onSubmit={handleSubmit}>
-        <FormField
-          label="Work email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-        />
+        <FormField label="Work email" type="email" value={SAMPLE_INVITATION.email} readOnly />
         <FormField
           label="Create password"
           type="password"
+          autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           hint={`${MIN_PASSWORD}+ characters with letters, numbers and symbols.`}
@@ -127,6 +131,7 @@ export function AgentActivate() {
         <FormField
           label="Confirm password"
           type="password"
+          autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           error={errors.confirm}
@@ -141,6 +146,8 @@ export function ActivationSuccess() {
   const navigate = useNavigate();
   return (
     <AuthShell
+      centered
+      showLogo={false}
       heading="Extension Agent · Activation Successful"
       sub="Successful first-time account setup."
       title="✓ Account activated"
