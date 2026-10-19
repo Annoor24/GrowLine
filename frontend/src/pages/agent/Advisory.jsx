@@ -21,7 +21,7 @@ export function SprayAdvisory() {
 
   return (
     <div className="stack">
-      <PageHeader title="Spray advisory" subtitle="Safety directive and forecast confidence are separate" />
+      <PageHeader bar="Agent" title="Spray advisory" subtitle="Safety directive and forecast confidence are separate" />
       <div className="grid grid-main-side">
         <Card title="Farm-specific spray guidance">
           <div className="stack">
@@ -80,7 +80,7 @@ export function SmsHistory() {
   ];
   return (
     <div className="stack">
-      <PageHeader title="SMS history" subtitle="View message delivery status and return to the list" />
+      <PageHeader bar="Agent" title="SMS history" subtitle="View message delivery status and return to the list" />
       <Card>
         <DataTable columns={columns} rows={data} empty="No SMS messages have been sent yet." />
       </Card>
@@ -96,7 +96,7 @@ export function SmsDetails() {
   if (!message) return <p className="notice notice-warning">Message not found.</p>;
   return (
     <div className="stack">
-      <PageHeader title="SMS details" subtitle="Message details and delivery outcomes" />
+      <PageHeader bar="Agent" title="SMS details" subtitle="Message details and delivery outcomes" />
       <div>
         <Button variant="secondary" as={Link} to="/agent/sms">
           ‹ Back to SMS list
@@ -134,7 +134,7 @@ export function AlertMonitoring() {
   ];
   return (
     <div className="stack">
-      <PageHeader title="Alert monitoring" subtitle="Placeholder screen: no design provided yet" />
+      <PageHeader bar="Agent" title="Alert monitoring" subtitle="Placeholder screen: no design provided yet" />
       <Card>
         <DataTable columns={columns} rows={data.recent} empty="No recent alert activity." />
       </Card>

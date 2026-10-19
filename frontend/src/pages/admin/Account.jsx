@@ -14,7 +14,7 @@ export function AdminProfile() {
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
   return (
     <div className="stack">
-      <PageHeader title="My Profile" subtitle="Your Super Admin account details" />
+      <PageHeader bar="Super Admin" title="My Profile" subtitle="Your Super Admin account details" />
       <Card title="Personal information">
         <div className="stack">
           <div className="form-grid">
@@ -66,7 +66,7 @@ export function AdminEditProfile() {
 
   return (
     <div className="stack">
-      <PageHeader title="Edit Profile" subtitle="Manage your personal contact information" />
+      <PageHeader bar="Super Admin" title="Edit Profile" subtitle="Manage your personal contact information" />
       <Card title="Personal information">
         <div className="stack">
           <div className="form-grid">
@@ -90,7 +90,7 @@ export function AdminEditProfile() {
 export function AdminSettings() {
   return (
     <div className="stack">
-      <PageHeader title="Personal Settings" subtitle="Manage your own security and alerts" />
+      <PageHeader bar="Super Admin" title="Personal Settings" subtitle="Manage your own security and alerts" />
       <Card title="Security">
         <div className="row">
           <div style={{ flex: 1, minWidth: 220 }}>

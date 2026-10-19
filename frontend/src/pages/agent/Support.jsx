@@ -15,7 +15,7 @@ export function Notifications() {
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
   return (
     <div className="stack">
-      <PageHeader title="Notifications" subtitle="Messages from GrowLine Super Admin" />
+      <PageHeader bar="Agent" title="Notifications" subtitle="Messages from GrowLine Super Admin" />
       {data.map((item) => (
         <Card key={item.id} title={item.title} subtitle={`${item.when} • From ${item.from}`}>
           <p>{item.body}</p>
@@ -38,7 +38,7 @@ export function Complaints() {
   ];
   return (
     <div className="stack">
-      <PageHeader
+      <PageHeader bar="Agent"
         title="Complaints & help"
         subtitle="Raise and track requests to Super Admin"
         actions={
@@ -80,7 +80,7 @@ export function NewComplaint() {
 
   return (
     <div className="stack">
-      <PageHeader title="Contact Super Admin" subtitle="Submit a complaint or support request" />
+      <PageHeader bar="Agent" title="Contact Super Admin" subtitle="Submit a complaint or support request" />
       <Card title="New support request">
         <form className="stack" onSubmit={submit}>
           <FormField
@@ -138,7 +138,7 @@ export function ComplaintThread() {
 
   return (
     <div className="stack">
-      <PageHeader title="Complaint conversation" subtitle="View admin replies and complaint status" />
+      <PageHeader bar="Agent" title="Complaint conversation" subtitle="View admin replies and complaint status" />
       <Card
         title={`${complaint.id} • ${complaint.subject}`}
         subtitle={`Status: ${complaint.status} • Priority: ${complaint.priority}`}

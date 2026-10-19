@@ -25,7 +25,7 @@ export function AdminComplaints() {
   ];
   return (
     <div className="stack">
-      <PageHeader title="Complaints & support" subtitle="Receive, assign, respond and resolve agent complaints" />
+      <PageHeader bar="Admin" title="Complaints & support" subtitle="Receive, assign, respond and resolve agent complaints" />
       <div className="grid grid-4">
         {stats.map((stat) => (
           <StatCard key={stat.label} {...stat} />
@@ -61,7 +61,7 @@ export function AdminComplaintDetail() {
 
   return (
     <div className="stack">
-      <PageHeader title={`Complaint ${complaint.id}`} subtitle="Two-way communication with extension agents" />
+      <PageHeader bar="Admin" title={`Complaint ${complaint.id}`} subtitle="Two-way communication with extension agents" />
       <div className="grid grid-main-side">
         <Card title={complaint.subject} subtitle={`Submitted by ${complaint.agent} • ${complaint.submitted}`}>
           <div className="stack">
@@ -121,7 +121,7 @@ export function AdminNotifications() {
   ];
   return (
     <div className="stack">
-      <PageHeader
+      <PageHeader bar="Admin"
         title="Agent notifications"
         subtitle="Dashboard notifications with email backup"
         actions={
@@ -156,7 +156,7 @@ export function ComposeNotification() {
 
   return (
     <div className="stack">
-      <PageHeader title="Send agent notification" subtitle="Send to one, selected or all extension agents" />
+      <PageHeader bar="Admin" title="Send agent notification" subtitle="Send to one, selected or all extension agents" />
       <div className="grid grid-main-side">
         <Card title="New dashboard notification">
           <div className="stack">

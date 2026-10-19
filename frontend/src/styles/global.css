@@ -212,6 +212,43 @@ textarea {
   margin-top: 2px;
 }
 
+/* White header bar used on list, form and detail pages (bleeds to the edges of the main area) */
+.page-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  margin: -28px -36px 22px;
+  padding: 22px 36px 18px;
+}
+
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green-700);
+  white-space: nowrap;
+}
+
+.who-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green-500);
+}
+
+.page-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: -6px 0 16px;
+}
+
 .crumb {
   font-size: 11px;
   letter-spacing: 0.04em;
@@ -746,6 +783,11 @@ textarea.input {
 
   .main {
     padding: 20px 16px 40px;
+  }
+
+  .page-bar {
+    margin: -20px -16px 18px;
+    padding: 16px;
   }
 
   .grid-4 {

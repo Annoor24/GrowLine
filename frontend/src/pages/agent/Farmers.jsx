@@ -36,7 +36,7 @@ export function MyFarmers() {
   ];
   return (
     <div className="stack">
-      <PageHeader
+      <PageHeader bar="Agent"
         title="My farmers"
         subtitle="Farmers assigned to your account"
         actions={
@@ -93,7 +93,7 @@ export function RegisterFarmer() {
 
   return (
     <div className="stack">
-      <PageHeader title="Register farmer" subtitle="Create a farmer record before adding their farms" />
+      <PageHeader bar="Agent" title="Register farmer" subtitle="Create a farmer record before adding their farms" />
       <Card title="New farmer">
         <div className="stack">
           <div className="form-grid">
@@ -158,7 +158,7 @@ export function ExistingFarmerFound() {
   const navigate = useNavigate();
   return (
     <div className="stack">
-      <PageHeader title="Existing farmer found" subtitle="This phone number is already registered. Add a farm to the existing profile." />
+      <PageHeader bar="Agent" title="Existing farmer found" subtitle="This phone number is already registered. Add a farm to the existing profile." />
       <p className="notice notice-warning">
         <strong>Existing record detected.</strong>
         <br />
@@ -206,7 +206,7 @@ export function MyFarms() {
   ];
   return (
     <div className="stack">
-      <PageHeader
+      <PageHeader bar="Agent"
         title="My farms"
         subtitle="Each farm is recorded separately under its owner"
         actions={
@@ -247,7 +247,7 @@ export function AddFarm() {
 
   return (
     <div className="stack">
-      <PageHeader title="Add farm" subtitle="A farmer can have more than one farm at different coordinates" />
+      <PageHeader bar="Agent" title="Add farm" subtitle="A farmer can have more than one farm at different coordinates" />
       <Card title="New farm">
         <div className="stack">
           <FormField
@@ -281,7 +281,7 @@ export function AddAnotherFarm() {
   const navigate = useNavigate();
   return (
     <div className="stack">
-      <PageHeader title="Add another farm" subtitle="One tomato farmer can have multiple independent farms" />
+      <PageHeader bar="Agent" title="Add another farm" subtitle="One tomato farmer can have multiple independent farms" />
       <Card title="Farmer FRM-0104 · Amina Bello">
         <div className="kv">
           <span>Farm FARM-0201 · 1.2 ha · <StatusPill>Verified</StatusPill></span>

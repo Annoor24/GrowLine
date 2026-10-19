@@ -16,7 +16,7 @@ export function Profile() {
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
   return (
     <div className="stack">
-      <PageHeader
+      <PageHeader bar="Agent"
         title="My profile"
         subtitle="Your profile and assigned coverage"
         actions={[
@@ -68,7 +68,7 @@ export function EditProfile() {
 
   return (
     <div className="stack">
-      <PageHeader title="Edit profile" subtitle="Update your contact details" />
+      <PageHeader bar="Agent" title="Edit profile" subtitle="Update your contact details" />
       <Card title="Personal information">
         <div className="stack">
           <div className="form-grid">
@@ -96,7 +96,7 @@ export function EditProfile() {
 export function Settings() {
   return (
     <div className="stack">
-      <PageHeader title="Settings" subtitle="Manage account security and notification preferences" />
+      <PageHeader bar="Agent" title="Settings" subtitle="Manage account security and notification preferences" />
       <Card title="Security">
         <div className="row">
           <div style={{ flex: 1, minWidth: 220 }}>
@@ -142,7 +142,7 @@ export function ChangePassword({ backTo = "/agent/settings" }) {
 
   return (
     <div className="stack">
-      <PageHeader title="Change password" subtitle="Keep your GrowLine account secure" />
+      <PageHeader bar="Agent" title="Change password" subtitle="Keep your GrowLine account secure" />
       <Card title="Update password">
         <form className="stack" onSubmit={submit}>
           <div className="form-grid">

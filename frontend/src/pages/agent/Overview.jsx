@@ -56,32 +56,34 @@ export default function AgentOverview() {
         ))}
       </div>
 
-      <Card title="Farm advisory summary" subtitle={`${summary.total} monitored tomato farms`} actions={<StatusPill>Today</StatusPill>}>
-        <div className="risk-bar">
-          <span style={{ flex: summary.favourable }} />
-          <span style={{ flex: summary.caution }} />
-          <span style={{ flex: summary.highRisk }} />
-        </div>
-        <div className="row" style={{ marginTop: 12, gap: 32 }}>
-          <div>
-            <div className="small muted">Favourable</div>
-            <strong>{summary.favourable}</strong>
+      <div className="grid grid-2">
+        <Card title="Farm advisory summary" subtitle={`${summary.total} monitored tomato farms`} actions={<StatusPill>Today</StatusPill>}>
+          <div className="risk-bar">
+            <span style={{ flex: summary.favourable }} />
+            <span style={{ flex: summary.caution }} />
+            <span style={{ flex: summary.highRisk }} />
           </div>
-          <div>
-            <div className="small muted">Caution</div>
-            <strong>{summary.caution}</strong>
+          <div className="row" style={{ marginTop: 12, gap: 32 }}>
+            <div>
+              <div className="small muted">Favourable</div>
+              <strong>{summary.favourable}</strong>
+            </div>
+            <div>
+              <div className="small muted">Caution</div>
+              <strong>{summary.caution}</strong>
+            </div>
+            <div>
+              <div className="small muted">High risk</div>
+              <strong>{summary.highRisk}</strong>
+            </div>
           </div>
-          <div>
-            <div className="small muted">High risk</div>
-            <strong>{summary.highRisk}</strong>
-          </div>
-        </div>
-        <p style={{ marginTop: 12 }}>
-          <Link className="link-button" to="/agent/advisory">
-            View farm advisories
-          </Link>
-        </p>
-      </Card>
+          <p style={{ marginTop: 12 }}>
+            <Link className="link-button" to="/agent/advisory">
+              View farm advisories
+            </Link>
+          </p>
+        </Card>
+      </div>
 
       <Card
         title="Recent advisory activity"

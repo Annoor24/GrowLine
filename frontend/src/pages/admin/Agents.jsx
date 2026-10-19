@@ -37,7 +37,7 @@ export function AdminAgents() {
   ];
   return (
     <div className="stack">
-      <PageHeader
+      <PageHeader bar="Admin"
         title="Extension agents"
         subtitle="Assign farmers, review workload and manage access"
         actions={[
@@ -76,7 +76,7 @@ export function AdminAgentProfile() {
   ];
   return (
     <div className="stack">
-      <PageHeader title="Extension agent profile" subtitle="Agent details, assigned farmers and activity" />
+      <PageHeader bar="Admin" title="Extension agent profile" subtitle="Agent details, assigned farmers and activity" />
       <Card>
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div className="kv">
@@ -115,7 +115,7 @@ export function AgentInvitations() {
   ];
   return (
     <div className="stack">
-      <PageHeader
+      <PageHeader bar="Admin"
         title="Extension Agents · Invitations"
         subtitle="Manage activation and delivery status without sharing passwords."
         actions={
@@ -153,7 +153,7 @@ export function CreateAgent() {
 
   return (
     <div className="stack">
-      <PageHeader title="Extension Agents · Add New Agent" subtitle="Create an agent and send a secure activation link." />
+      <PageHeader bar="Admin" title="Extension Agents · Add New Agent" subtitle="Create an agent and send a secure activation link." />
       <Card title="Agent account details" subtitle="Only Super Admins can create Extension Agent accounts.">
         <form className="stack" onSubmit={submit}>
           <div className="form-grid">
@@ -188,7 +188,7 @@ export function AgentSecurity() {
   if (!agent) return <p className="notice notice-warning">Agent not found.</p>;
   return (
     <div className="stack">
-      <PageHeader title="Agent Account & Password Reset" subtitle="Control agent account access safely" />
+      <PageHeader bar="Admin" title="Agent Account & Password Reset" subtitle="Control agent account access safely" />
       <Card title="Agent account">
         <div className="form-grid">
           <FormField label="Agent" value={agent.name} readOnly />
