@@ -25,8 +25,8 @@ const FARM_TILES = [
 
 export function AdminFarmers() {
   const navigate = useNavigate();
-  const { data, loading, error } = useAsync(api.adminFarmers);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.adminFarmers);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "id", label: "Farmer ID" },
     { key: "name", label: "Farmer" },
@@ -45,7 +45,12 @@ export function AdminFarmers() {
         ))}
       </div>
       <Card title="Farmer directory" subtitle="Farmer ID is unique; API assigned per farmer for pilot consistency">
-        <DataTable columns={columns} rows={data} onRowClick={(row) => navigate(`/admin/farmers/${row.id}`)} />
+        <DataTable
+          columns={columns}
+          rows={data}
+          onRowClick={(row) => navigate(`/admin/farmers/${row.id}`)}
+          empty="No farmers have been registered yet."
+        />
       </Card>
     </div>
   );
@@ -53,11 +58,11 @@ export function AdminFarmers() {
 
 export function AdminFarmerDetail() {
   const { id } = useParams();
-  const { data, loading, error } = useAsync(
+  const { data, loading, error, reload } = useAsync(
     () => Promise.all([api.adminFarmers(), api.adminFarms(), api.adminAlerts()]),
     [id],
   );
-  if (loading || !data) return <Loading error={error} />;
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const [farmers, farms, alerts] = data;
   const farmer = farmers.find((item) => item.id === id);
   if (!farmer) return <p className="notice notice-warning">Farmer not found.</p>;
@@ -104,8 +109,8 @@ export function AdminFarmerDetail() {
 
 export function AdminFarms() {
   const navigate = useNavigate();
-  const { data, loading, error } = useAsync(api.adminFarms);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.adminFarms);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "id", label: "Farm ID" },
     { key: "farmerId", label: "Farmer ID" },
@@ -123,7 +128,12 @@ export function AdminFarms() {
         ))}
       </div>
       <Card title="Farm records" subtitle="Do not derive exact boundaries from centre point + estimated area">
-        <DataTable columns={columns} rows={data} onRowClick={(row) => navigate(`/admin/farms/${row.id}`)} />
+        <DataTable
+          columns={columns}
+          rows={data}
+          onRowClick={(row) => navigate(`/admin/farms/${row.id}`)}
+          empty="No farms have been recorded yet."
+        />
       </Card>
     </div>
   );
@@ -131,11 +141,11 @@ export function AdminFarms() {
 
 export function AdminFarmDetail() {
   const { id } = useParams();
-  const { data, loading, error } = useAsync(
+  const { data, loading, error, reload } = useAsync(
     () => Promise.all([api.adminFarms(), api.adminFarmers(), api.adminAlerts()]),
     [id],
   );
-  if (loading || !data) return <Loading error={error} />;
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const [farms, farmers, alerts] = data;
   const farm = farms.find((item) => item.id === id);
   if (!farm) return <p className="notice notice-warning">Farm not found.</p>;

@@ -1,6 +1,7 @@
 import Button from "./Button.jsx";
 
-export default function GpsCapture({ gps, onCapture, intro }) {
+export default function GpsCapture({ gps, onCapture, intro, error }) {
+  const retry = gps.status === "error";
   return (
     <div className="stack">
       <div>
@@ -13,13 +14,14 @@ export default function GpsCapture({ gps, onCapture, intro }) {
       </p>
       <div className="row">
         <Button onClick={onCapture} disabled={gps.status === "waiting"}>
-          Get Farm GPS Location Coordinates
+          {retry ? "Retry GPS capture" : "Get Farm GPS Location Coordinates"}
         </Button>
-        <div className="input" style={{ flex: 1, minWidth: 220 }}>
+        <div className="input" style={{ flex: 1, minWidth: 220 }} aria-live="polite">
           <div className="small muted">Latitude / Longitude</div>
           {gps.message}
         </div>
       </div>
+      {error ? <span className="error-text">{error}</span> : null}
       <p className="hint">
         Location permission is required. Accuracy (± metres), timestamp and retry on failure are
         shown. GPS coordinates are saved with this farm record, not as a single location for all

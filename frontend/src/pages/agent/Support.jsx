@@ -11,8 +11,8 @@ import PageHeader from "../../components/PageHeader.jsx";
 import StatusPill from "../../components/StatusPill.jsx";
 
 export function Notifications() {
-  const { data, loading, error } = useAsync(api.agentNotifications);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.agentNotifications);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   return (
     <div className="stack">
       <PageHeader title="Notifications" subtitle="Messages from GrowLine Super Admin" />
@@ -27,8 +27,8 @@ export function Notifications() {
 
 export function Complaints() {
   const navigate = useNavigate();
-  const { data, loading, error } = useAsync(api.agentComplaints);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.agentComplaints);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "id", label: "Ticket" },
     { key: "subject", label: "Subject" },
@@ -48,7 +48,12 @@ export function Complaints() {
         }
       />
       <Card>
-        <DataTable columns={columns} rows={data} onRowClick={(row) => navigate(`/agent/complaints/${row.id}`)} />
+        <DataTable
+          columns={columns}
+          rows={data}
+          onRowClick={(row) => navigate(`/agent/complaints/${row.id}`)}
+          empty="You have not raised any complaints. Use “New complaint” if you need help."
+        />
       </Card>
     </div>
   );
@@ -57,16 +62,20 @@ export function Complaints() {
 export function NewComplaint() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ subject: "", priority: "", description: "" });
-  const [error, setError] = useState("");
-  const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
+  const [errors, setErrors] = useState({});
+  const set = (key) => (event) => {
+    setForm({ ...form, [key]: event.target.value });
+    if (errors[key]) setErrors({ ...errors, [key]: "" });
+  };
 
   function submit(event) {
     event.preventDefault();
-    if (!form.subject || !form.priority || !form.description) {
-      setError("Fill in the subject, priority and description.");
-      return;
-    }
-    navigate("/agent/complaints");
+    const next = {};
+    if (!form.subject.trim()) next.subject = "Enter a short subject.";
+    if (!form.priority) next.priority = "Choose a priority.";
+    if (form.description.trim().length < 10) next.description = "Describe the issue in at least 10 characters.";
+    setErrors(next);
+    if (Object.keys(next).length === 0) navigate("/agent/complaints");
   }
 
   return (
@@ -74,13 +83,19 @@ export function NewComplaint() {
       <PageHeader title="Contact Super Admin" subtitle="Submit a complaint or support request" />
       <Card title="New support request">
         <form className="stack" onSubmit={submit}>
-          {error ? <p className="notice notice-danger">{error}</p> : null}
-          <FormField label="Subject" placeholder="Enter complaint subject" value={form.subject} onChange={set("subject")} />
+          <FormField
+            label="Subject"
+            placeholder="Enter complaint subject"
+            value={form.subject}
+            onChange={set("subject")}
+            error={errors.subject}
+          />
           <FormField
             label="Priority"
             kind="select"
             value={form.priority}
             onChange={set("priority")}
+            error={errors.priority}
             options={[
               { value: "", label: "Select priority" },
               { value: "Low", label: "Low" },
@@ -94,6 +109,7 @@ export function NewComplaint() {
             placeholder="Describe the issue you need help with…"
             value={form.description}
             onChange={set("description")}
+            error={errors.description}
             hint="Include the affected farmer or farm ID, what happened and when. Never include passwords."
           />
           <div className="form-actions">
@@ -107,10 +123,10 @@ export function NewComplaint() {
 
 export function ComplaintThread() {
   const { id } = useParams();
-  const { data, loading, error } = useAsync(api.agentComplaints);
+  const { data, loading, error, reload } = useAsync(api.agentComplaints);
   const [reply, setReply] = useState("");
   const [sent, setSent] = useState([]);
-  if (loading || !data) return <Loading error={error} />;
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const complaint = data.find((item) => item.id === id);
   if (!complaint) return <p className="notice notice-warning">Complaint not found.</p>;
 

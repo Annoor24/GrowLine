@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api/index.js";
 import useAsync from "../../hooks/useAsync.js";
 import useGps from "../../hooks/useGps.js";
+import { isNigerianPhone } from "../../utils/validate.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
 import DataTable from "../../components/DataTable.jsx";
@@ -16,8 +17,8 @@ import StatusPill from "../../components/StatusPill.jsx";
 const EXISTING_PHONE = "08035550142";
 
 export function MyFarmers() {
-  const { data, loading, error } = useAsync(api.agentFarmers);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.agentFarmers);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "id", label: "Farmer ID" },
     { key: "name", label: "Farmer" },
@@ -45,7 +46,11 @@ export function MyFarmers() {
         }
       />
       <Card>
-        <DataTable columns={columns} rows={data} />
+        <DataTable
+          columns={columns}
+          rows={data}
+          empty="No farmers are assigned to you yet. Use “Register farmer” to add the first one."
+        />
       </Card>
     </div>
   );
@@ -55,15 +60,29 @@ export function RegisterFarmer() {
   const navigate = useNavigate();
   const { gps, capture } = useGps();
   const [form, setForm] = useState({ name: "", phone: "", state: "", lga: "" });
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
 
-  const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
+  const set = (key) => (event) => {
+    setForm({ ...form, [key]: event.target.value });
+    if (errors[key]) setErrors({ ...errors, [key]: "" });
+  };
+
+  function validate(addFarm) {
+    const next = {};
+    if (!form.name.trim()) next.name = "Enter the farmer's full name.";
+    if (!form.phone.trim()) {
+      next.phone = "Enter the farmer's phone number.";
+    } else if (!isNigerianPhone(form.phone)) {
+      next.phone = "Use a Nigerian mobile number, e.g. 0803 123 4567 or +234 803 123 4567.";
+    }
+    if (!form.state) next.state = "Choose a state.";
+    if (addFarm && gps.status !== "ok") next.gps = "Capture the farm GPS location first.";
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
 
   function save(addFarm) {
-    if (!form.name || !form.phone) {
-      setError("Enter the farmer's name and phone number.");
-      return;
-    }
+    if (!validate(addFarm)) return;
     const digits = form.phone.replace(/\D/g, "");
     if (digits.endsWith(EXISTING_PHONE.slice(1))) {
       navigate("/agent/farmers/existing");
@@ -77,9 +96,14 @@ export function RegisterFarmer() {
       <PageHeader title="Register farmer" subtitle="Create a farmer record before adding their farms" />
       <Card title="New farmer">
         <div className="stack">
-          {error ? <p className="notice notice-danger">{error}</p> : null}
           <div className="form-grid">
-            <FormField label="Full name" placeholder="Enter farmer name" value={form.name} onChange={set("name")} />
+            <FormField
+              label="Full name"
+              placeholder="Enter farmer name"
+              value={form.name}
+              onChange={set("name")}
+              error={errors.name}
+            />
             <FormField
               label="Phone number"
               type="tel"
@@ -87,12 +111,14 @@ export function RegisterFarmer() {
               value={form.phone}
               onChange={set("phone")}
               hint="Nigerian numbers only, e.g. +234 803 123 4567"
+              error={errors.phone}
             />
             <FormField
               label="State"
               kind="select"
               value={form.state}
               onChange={set("state")}
+              error={errors.state}
               options={[
                 { value: "", label: "Select state" },
                 { value: "kano", label: "Kano" },
@@ -109,7 +135,12 @@ export function RegisterFarmer() {
             />
             <FormField label="Assigned extension agent" value="Current agent (auto assigned)" readOnly />
           </div>
-          <GpsCapture gps={gps} onCapture={capture} intro="Capture coordinates for the first farm. Additional farms can be added after saving." />
+          <GpsCapture
+            gps={gps}
+            onCapture={capture}
+            error={errors.gps}
+            intro="Capture coordinates for the first farm. Additional farms can be added after saving."
+          />
           <div className="form-actions">
             <Button onClick={() => save(true)}>Save and add farm</Button>
             <Button variant="soft" onClick={() => save(false)}>
@@ -164,8 +195,8 @@ export function ExistingFarmerFound() {
 }
 
 export function MyFarms() {
-  const { data, loading, error } = useAsync(api.agentFarms);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.agentFarms);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "id", label: "Farm ID" },
     { key: "name", label: "Farm" },
@@ -185,7 +216,11 @@ export function MyFarms() {
         }
       />
       <Card>
-        <DataTable columns={columns} rows={data} />
+        <DataTable
+          columns={columns}
+          rows={data}
+          empty="No farms recorded yet. Use “Add farm” to capture the first one."
+        />
       </Card>
     </div>
   );
@@ -196,18 +231,14 @@ export function AddFarm() {
   const { gps, capture } = useGps();
   const { data } = useAsync(api.agentFarmers);
   const [farmerId, setFarmerId] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
 
   function save() {
-    if (!farmerId) {
-      setError("Choose the farmer this farm belongs to.");
-      return;
-    }
-    if (gps.status !== "ok") {
-      setError("Capture the farm GPS location before saving.");
-      return;
-    }
-    navigate("/agent/farms");
+    const next = {};
+    if (!farmerId) next.farmer = "Choose the farmer this farm belongs to.";
+    if (gps.status !== "ok") next.gps = "Capture the farm GPS location before saving.";
+    setErrors(next);
+    if (Object.keys(next).length === 0) navigate("/agent/farms");
   }
 
   const options = [{ value: "", label: "Select existing farmer's name" }].concat(
@@ -219,15 +250,23 @@ export function AddFarm() {
       <PageHeader title="Add farm" subtitle="A farmer can have more than one farm at different coordinates" />
       <Card title="New farm">
         <div className="stack">
-          {error ? <p className="notice notice-danger">{error}</p> : null}
           <FormField
             label="Choose from existing farmers"
             kind="select"
             value={farmerId}
-            onChange={(e) => setFarmerId(e.target.value)}
+            onChange={(e) => {
+              setFarmerId(e.target.value);
+              setErrors({ ...errors, farmer: "" });
+            }}
+            error={errors.farmer}
             options={options}
           />
-          <GpsCapture gps={gps} onCapture={capture} intro="Capture coordinates for the farm. You can add as many farms as needed." />
+          <GpsCapture
+            gps={gps}
+            onCapture={capture}
+            error={errors.gps}
+            intro="Capture coordinates for the farm. You can add as many farms as needed."
+          />
           <div className="form-actions">
             <Button onClick={save}>Save and add farm</Button>
           </div>

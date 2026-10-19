@@ -8,8 +8,8 @@ import StatCard from "../../components/StatCard.jsx";
 import StatusPill from "../../components/StatusPill.jsx";
 
 export default function AdminOverview() {
-  const { data, loading, error } = useAsync(api.adminOverview);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.adminOverview);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
 
   const apiColumns = [
     { key: "api", label: "API" },

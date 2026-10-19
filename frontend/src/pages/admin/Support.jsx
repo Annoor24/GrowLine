@@ -13,8 +13,8 @@ import StatusPill from "../../components/StatusPill.jsx";
 
 export function AdminComplaints() {
   const navigate = useNavigate();
-  const { data, loading, error } = useAsync(() => Promise.all([api.adminComplaints(), api.adminComplaintStats()]));
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(() => Promise.all([api.adminComplaints(), api.adminComplaintStats()]));
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const [complaints, stats] = data;
   const columns = [
     { key: "id", label: "Ticket" },
@@ -32,7 +32,12 @@ export function AdminComplaints() {
         ))}
       </div>
       <Card>
-        <DataTable columns={columns} rows={complaints} onRowClick={(row) => navigate(`/admin/complaints/${row.id}`)} />
+        <DataTable
+          columns={columns}
+          rows={complaints}
+          onRowClick={(row) => navigate(`/admin/complaints/${row.id}`)}
+          empty="No complaints received."
+        />
       </Card>
     </div>
   );
@@ -40,11 +45,11 @@ export function AdminComplaints() {
 
 export function AdminComplaintDetail() {
   const { id } = useParams();
-  const { data, loading, error } = useAsync(api.adminComplaints);
+  const { data, loading, error, reload } = useAsync(api.adminComplaints);
   const [reply, setReply] = useState("");
   const [replies, setReplies] = useState([]);
   const [resolved, setResolved] = useState(false);
-  if (loading || !data) return <Loading error={error} />;
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const complaint = data.find((item) => item.id === id);
   if (!complaint) return <p className="notice notice-warning">Complaint not found.</p>;
 
@@ -105,8 +110,8 @@ export function AdminComplaintDetail() {
 }
 
 export function AdminNotifications() {
-  const { data, loading, error } = useAsync(api.adminNotifications);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.adminNotifications);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "title", label: "Title" },
     { key: "recipients", label: "Recipients" },
@@ -126,7 +131,7 @@ export function AdminNotifications() {
         }
       />
       <Card>
-        <DataTable columns={columns} rows={data} />
+        <DataTable columns={columns} rows={data} empty="No notifications have been sent yet." />
       </Card>
     </div>
   );
@@ -135,15 +140,18 @@ export function AdminNotifications() {
 export function ComposeNotification() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ recipients: "all", title: "", message: "" });
-  const [error, setError] = useState("");
-  const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
+  const [errors, setErrors] = useState({});
+  const set = (key) => (event) => {
+    setForm({ ...form, [key]: event.target.value });
+    if (errors[key]) setErrors({ ...errors, [key]: "" });
+  };
 
   function send() {
-    if (!form.title || !form.message) {
-      setError("Enter a title and a message.");
-      return;
-    }
-    navigate("/admin/notifications");
+    const next = {};
+    if (!form.title.trim()) next.title = "Enter a title for the notification.";
+    if (!form.message.trim()) next.message = "Write the message agents should see.";
+    setErrors(next);
+    if (Object.keys(next).length === 0) navigate("/admin/notifications");
   }
 
   return (
@@ -152,7 +160,6 @@ export function ComposeNotification() {
       <div className="grid grid-main-side">
         <Card title="New dashboard notification">
           <div className="stack">
-            {error ? <p className="notice notice-danger">{error}</p> : null}
             <FormField
               label="Recipients"
               kind="select"
@@ -163,11 +170,18 @@ export function ComposeNotification() {
                 { value: "selected", label: "Selected agents" },
               ]}
             />
-            <FormField label="Notification title" value={form.title} onChange={set("title")} placeholder="Important platform update" />
+            <FormField
+              label="Notification title"
+              value={form.title}
+              onChange={set("title")}
+              placeholder="Important platform update"
+              error={errors.title}
+            />
             <FormField
               label="Message"
               kind="textarea"
               value={form.message}
+              error={errors.message}
               onChange={set("message")}
               placeholder="Write your announcement…"
             />

@@ -4,6 +4,7 @@ import AuthShell from "../../layouts/AuthShell.jsx";
 import FormField from "../../components/FormField.jsx";
 import Button from "../../components/Button.jsx";
 import { useAuth } from "../../auth/AuthContext.jsx";
+import { isEmail, passwordMessage } from "../../utils/validate.js";
 
 const MIN_PASSWORD = 12;
 
@@ -84,22 +85,19 @@ export function AgentActivate() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
 
   // MOCK: the link /activate/expired shows the expired screen.
   if (token === "expired") return <InvitationExpired />;
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (password.length < MIN_PASSWORD) {
-      setError(`Use at least ${MIN_PASSWORD} characters.`);
-      return;
-    }
-    if (password !== confirm) {
-      setError("The two passwords do not match.");
-      return;
-    }
-    navigate("/activation-success");
+    const next = {};
+    if (!isEmail(email)) next.email = "Enter the work email your invitation was sent to.";
+    if (passwordMessage(password)) next.password = passwordMessage(password);
+    if (password !== confirm) next.confirm = "The two passwords do not match.";
+    setErrors(next);
+    if (Object.keys(next).length === 0) navigate("/activation-success");
   }
 
   return (
@@ -111,20 +109,27 @@ export function AgentActivate() {
       footer="Activation links can only be used once."
     >
       <form className="stack" onSubmit={handleSubmit}>
-        {error ? <p className="notice notice-danger">{error}</p> : null}
-        <FormField label="Work email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <FormField
+          label="Work email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={errors.email}
+        />
         <FormField
           label="Create password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          hint={`At least ${MIN_PASSWORD} characters.`}
+          hint={`${MIN_PASSWORD}+ characters with letters, numbers and symbols.`}
+          error={errors.password}
         />
         <FormField
           label="Confirm password"
           type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
+          error={errors.confirm}
         />
         <Button type="submit">Activate my account</Button>
       </form>

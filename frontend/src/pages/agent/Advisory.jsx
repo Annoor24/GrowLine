@@ -11,10 +11,10 @@ import PageHeader from "../../components/PageHeader.jsx";
 import StatusPill from "../../components/StatusPill.jsx";
 
 export function SprayAdvisory() {
-  const { data, loading, error } = useAsync(api.agentAdvisories);
+  const { data, loading, error, reload } = useAsync(api.agentAdvisories);
   const [farmId, setFarmId] = useState("");
   const [sent, setSent] = useState(false);
-  if (loading || !data) return <Loading error={error} />;
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
 
   const selected = data.find((item) => item.farmId === (farmId || data[0].farmId));
   const safe = selected.directive === "Safe to spray";
@@ -61,8 +61,8 @@ export function SprayAdvisory() {
 
 export function SmsHistory() {
   const navigate = useNavigate();
-  const { data, loading, error } = useAsync(api.agentSmsMessages);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.agentSmsMessages);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "message", label: "Message" },
     { key: "date", label: "Date" },
@@ -82,7 +82,7 @@ export function SmsHistory() {
     <div className="stack">
       <PageHeader title="SMS history" subtitle="View message delivery status and return to the list" />
       <Card>
-        <DataTable columns={columns} rows={data} />
+        <DataTable columns={columns} rows={data} empty="No SMS messages have been sent yet." />
       </Card>
     </div>
   );
@@ -90,8 +90,8 @@ export function SmsHistory() {
 
 export function SmsDetails() {
   const { id } = useParams();
-  const { data, loading, error } = useAsync(api.agentSmsMessages);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.agentSmsMessages);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const message = data.find((item) => item.id === id);
   if (!message) return <p className="notice notice-warning">Message not found.</p>;
   return (
@@ -123,8 +123,8 @@ export function SmsDetails() {
 // NOT IN THE DESIGN: the sidebar lists "Alert Monitoring" but no screen was provided.
 // This placeholder reuses the recent advisory activity until the designer supplies one.
 export function AlertMonitoring() {
-  const { data, loading, error } = useAsync(api.agentOverview);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.agentOverview);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "farmer", label: "Farmer" },
     { key: "farmId", label: "Farm ID" },
@@ -136,7 +136,7 @@ export function AlertMonitoring() {
     <div className="stack">
       <PageHeader title="Alert monitoring" subtitle="Placeholder screen: no design provided yet" />
       <Card>
-        <DataTable columns={columns} rows={data.recent} />
+        <DataTable columns={columns} rows={data.recent} empty="No recent alert activity." />
       </Card>
     </div>
   );

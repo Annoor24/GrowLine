@@ -19,8 +19,8 @@ const SMS_TILES = [
 
 export function SmsMonitoring() {
   const navigate = useNavigate();
-  const { data, loading, error } = useAsync(api.adminAlerts);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.adminAlerts);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "id", label: "Alert ID" },
     { key: "farm", label: "Farmer / Farm", render: (row) => `${row.farmerId} / ${row.farmId}` },
@@ -38,7 +38,12 @@ export function SmsMonitoring() {
         ))}
       </div>
       <Card title="Alert delivery log" subtitle="Traceable by farmer, farm, API, gateway status and feedback">
-        <DataTable columns={columns} rows={data} onRowClick={(row) => navigate(`/admin/sms/${row.id}`)} />
+        <DataTable
+          columns={columns}
+          rows={data}
+          onRowClick={(row) => navigate(`/admin/sms/${row.id}`)}
+          empty="No alerts have been generated yet."
+        />
       </Card>
     </div>
   );
@@ -46,11 +51,11 @@ export function SmsMonitoring() {
 
 export function AlertDetail() {
   const { id } = useParams();
-  const { data, loading, error } = useAsync(
+  const { data, loading, error, reload } = useAsync(
     () => Promise.all([api.adminAlerts(), api.adminAlertDetail()]),
     [id],
   );
-  if (loading || !data) return <Loading error={error} />;
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const [alerts, extra] = data;
   const alert = alerts.find((item) => item.id === id);
   if (!alert) return <p className="notice notice-warning">Alert not found.</p>;
@@ -104,8 +109,8 @@ export function AlertDetail() {
 }
 
 export function Reports() {
-  const { data, loading, error } = useAsync(api.adminReports);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.adminReports);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "provider", label: "Provider" },
     { key: "assigned", label: "Assigned farmers" },

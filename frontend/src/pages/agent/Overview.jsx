@@ -10,8 +10,8 @@ import StatCard from "../../components/StatCard.jsx";
 import StatusPill from "../../components/StatusPill.jsx";
 
 export default function AgentOverview() {
-  const { data, loading, error } = useAsync(api.agentOverview);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.agentOverview);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
 
   const { summary } = data;
   const columns = [

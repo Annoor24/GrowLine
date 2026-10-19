@@ -4,8 +4,8 @@ import AuthShell from "../../layouts/AuthShell.jsx";
 import FormField from "../../components/FormField.jsx";
 import Button from "../../components/Button.jsx";
 import { useAuth } from "../../auth/AuthContext.jsx";
+import { passwordMessage } from "../../utils/validate.js";
 
-const MIN_PASSWORD = 12;
 const MAX_ATTEMPTS = 3;
 
 // MOCK: any email works; the password "wrong" simulates a failed login (3 attempts shown).
@@ -116,19 +116,15 @@ export function SetNewPassword() {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (password.length < MIN_PASSWORD) {
-      setError(`Use at least ${MIN_PASSWORD} characters.`);
-      return;
-    }
-    if (password !== confirm) {
-      setError("The two passwords do not match.");
-      return;
-    }
-    navigate("/admin/login");
+    const next = {};
+    if (passwordMessage(password)) next.password = passwordMessage(password);
+    if (password !== confirm) next.confirm = "The two passwords do not match.";
+    setErrors(next);
+    if (Object.keys(next).length === 0) navigate("/admin/login");
   }
 
   return (
@@ -140,9 +136,20 @@ export function SetNewPassword() {
       footer="Use 12+ characters with a mix of letters, numbers and symbols."
     >
       <form className="stack" onSubmit={handleSubmit}>
-        {error ? <p className="notice notice-danger">{error}</p> : null}
-        <FormField label="New password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        <FormField label="Confirm password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        <FormField
+          label="New password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={errors.password}
+        />
+        <FormField
+          label="Confirm password"
+          type="password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          error={errors.confirm}
+        />
         <Button type="submit">Update password</Button>
       </form>
     </AuthShell>

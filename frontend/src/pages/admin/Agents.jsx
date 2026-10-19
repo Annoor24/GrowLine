@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/index.js";
+import { isEmail, isNigerianPhone } from "../../utils/validate.js";
 import useAsync from "../../hooks/useAsync.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -12,8 +13,8 @@ import StatusPill from "../../components/StatusPill.jsx";
 
 export function AdminAgents() {
   const navigate = useNavigate();
-  const { data, loading, error } = useAsync(api.adminAgents);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.adminAgents);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "name", label: "Agent" },
     { key: "farmers", label: "Assigned farmers" },
@@ -49,7 +50,11 @@ export function AdminAgents() {
         ]}
       />
       <Card>
-        <DataTable columns={columns} rows={data} />
+        <DataTable
+          columns={columns}
+          rows={data}
+          empty="No extension agents yet. Use “Add agent” to invite the first one."
+        />
       </Card>
     </div>
   );
@@ -57,8 +62,8 @@ export function AdminAgents() {
 
 export function AdminAgentProfile() {
   const { id } = useParams();
-  const { data, loading, error } = useAsync(() => Promise.all([api.adminAgents(), api.adminFarmers()]), [id]);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(() => Promise.all([api.adminAgents(), api.adminFarmers()]), [id]);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const [agents, farmers] = data;
   const agent = agents.find((item) => item.id === id);
   if (!agent) return <p className="notice notice-warning">Agent not found.</p>;
@@ -99,8 +104,8 @@ export function AdminAgentProfile() {
 }
 
 export function AgentInvitations() {
-  const { data, loading, error } = useAsync(api.adminInvitations);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.adminInvitations);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "agent", label: "Agent" },
     { key: "area", label: "Area" },
@@ -120,7 +125,7 @@ export function AgentInvitations() {
         }
       />
       <Card title="Agent invitations" subtitle="Track activation, expiry and invitation delivery.">
-        <DataTable columns={columns} rows={data} />
+        <DataTable columns={columns} rows={data} empty="No invitations have been sent yet." />
       </Card>
     </div>
   );
@@ -129,16 +134,21 @@ export function AgentInvitations() {
 export function CreateAgent() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", phone: "", area: "" });
-  const [error, setError] = useState("");
-  const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
+  const [errors, setErrors] = useState({});
+  const set = (key) => (event) => {
+    setForm({ ...form, [key]: event.target.value });
+    if (errors[key]) setErrors({ ...errors, [key]: "" });
+  };
 
   function submit(event) {
     event.preventDefault();
-    if (!form.name || !form.email || !form.phone || !form.area) {
-      setError("Fill in all fields before sending the invitation.");
-      return;
-    }
-    navigate("/admin/agents/invitations");
+    const next = {};
+    if (!form.name.trim()) next.name = "Enter the agent's full name.";
+    if (!isEmail(form.email)) next.email = "Enter a valid work email, e.g. name@example.ng.";
+    if (!isNigerianPhone(form.phone)) next.phone = "Use a Nigerian mobile number, e.g. 0803 123 4567.";
+    if (!form.area.trim()) next.area = "Enter the agent's assigned area.";
+    setErrors(next);
+    if (Object.keys(next).length === 0) navigate("/admin/agents/invitations");
   }
 
   return (
@@ -146,12 +156,11 @@ export function CreateAgent() {
       <PageHeader title="Extension Agents · Add New Agent" subtitle="Create an agent and send a secure activation link." />
       <Card title="Agent account details" subtitle="Only Super Admins can create Extension Agent accounts.">
         <form className="stack" onSubmit={submit}>
-          {error ? <p className="notice notice-danger">{error}</p> : null}
           <div className="form-grid">
-            <FormField label="Full name" value={form.name} onChange={set("name")} />
-            <FormField label="Work email" type="email" value={form.email} onChange={set("email")} />
-            <FormField label="Phone number" type="tel" value={form.phone} onChange={set("phone")} />
-            <FormField label="Assigned area" value={form.area} onChange={set("area")} />
+            <FormField label="Full name" value={form.name} onChange={set("name")} error={errors.name} />
+            <FormField label="Work email" type="email" value={form.email} onChange={set("email")} error={errors.email} />
+            <FormField label="Phone number" type="tel" value={form.phone} onChange={set("phone")} error={errors.phone} />
+            <FormField label="Assigned area" value={form.area} onChange={set("area")} error={errors.area} />
             <FormField label="Account role" value="Extension Agent (fixed)" readOnly />
             <FormField label="Account status" value="Pending activation" readOnly />
           </div>
@@ -172,9 +181,9 @@ export function CreateAgent() {
 
 export function AgentSecurity() {
   const { id } = useParams();
-  const { data, loading, error } = useAsync(api.adminAgents);
+  const { data, loading, error, reload } = useAsync(api.adminAgents);
   const [sent, setSent] = useState(false);
-  if (loading || !data) return <Loading error={error} />;
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const agent = data.find((item) => item.id === id);
   if (!agent) return <p className="notice notice-warning">Agent not found.</p>;
   return (

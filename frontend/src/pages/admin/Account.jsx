@@ -7,10 +7,11 @@ import Card from "../../components/Card.jsx";
 import FormField from "../../components/FormField.jsx";
 import Loading from "../../components/Loading.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
+import { isEmail, isNigerianPhone } from "../../utils/validate.js";
 
 export function AdminProfile() {
-  const { data, loading, error } = useAsync(api.adminProfile);
-  if (loading || !data) return <Loading error={error} />;
+  const { data, loading, error, reload } = useAsync(api.adminProfile);
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   return (
     <div className="stack">
       <PageHeader title="My Profile" subtitle="Your Super Admin account details" />
@@ -41,11 +42,27 @@ export function AdminProfile() {
 
 export function AdminEditProfile() {
   const navigate = useNavigate();
-  const { data, loading, error } = useAsync(api.adminProfile);
+  const { data, loading, error, reload } = useAsync(api.adminProfile);
   const [form, setForm] = useState(null);
-  if (loading || !data) return <Loading error={error} />;
+  const [errors, setErrors] = useState({});
+  if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const values = form || { name: data.name, email: data.email, phone: data.phone };
-  const set = (key) => (event) => setForm({ ...values, [key]: event.target.value });
+  const set = (key) => (event) => {
+    setForm({ ...values, [key]: event.target.value });
+    if (errors[key]) setErrors({ ...errors, [key]: "" });
+  };
+
+  function save() {
+    const next = {};
+    if (!values.name.trim()) next.name = "Enter your full name.";
+    if (!isEmail(values.email)) next.email = "Enter a valid email address.";
+    // The sample phone number is a placeholder, so only check it once it has been changed.
+    if (values.phone !== data.phone && !isNigerianPhone(values.phone)) {
+      next.phone = "Use a Nigerian mobile number, e.g. 0803 123 4567.";
+    }
+    setErrors(next);
+    if (Object.keys(next).length === 0) navigate("/admin/profile");
+  }
 
   return (
     <div className="stack">
@@ -53,13 +70,13 @@ export function AdminEditProfile() {
       <Card title="Personal information">
         <div className="stack">
           <div className="form-grid">
-            <FormField label="Full name" value={values.name} onChange={set("name")} />
-            <FormField label="Email address" type="email" value={values.email} onChange={set("email")} />
-            <FormField label="Phone number" value={values.phone} onChange={set("phone")} />
+            <FormField label="Full name" value={values.name} onChange={set("name")} error={errors.name} />
+            <FormField label="Email address" type="email" value={values.email} onChange={set("email")} error={errors.email} />
+            <FormField label="Phone number" value={values.phone} onChange={set("phone")} error={errors.phone} />
             <FormField label="Profile photo" value="Upload / replace photo" readOnly />
           </div>
           <div className="form-actions">
-            <Button onClick={() => navigate("/admin/profile")}>Save changes</Button>
+            <Button onClick={save}>Save changes</Button>
             <Button variant="secondary" onClick={() => navigate("/admin/profile")}>
               Cancel
             </Button>
