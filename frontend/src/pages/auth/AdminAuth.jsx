@@ -5,28 +5,45 @@ import FormField from "../../components/FormField.jsx";
 import Button from "../../components/Button.jsx";
 import { useAuth } from "../../auth/AuthContext.jsx";
 import { passwordMessage } from "../../utils/validate.js";
+import { describeLoginError } from "../../auth/loginErrors.js";
 
 const MAX_ATTEMPTS = 3;
 
-// MOCK: any email works; the password "wrong" simulates a failed login (3 attempts shown).
 export function AdminSignIn() {
-  const { signIn } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // "Attempts remaining" is display only: the backend does not report or enforce an attempt count.
   const [attemptsLeft, setAttemptsLeft] = useState(MAX_ATTEMPTS);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState(false); // wrong email or password
+  const [notice, setNotice] = useState(""); // any other problem (no connection, wrong account type)
+  const [busy, setBusy] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    if (!email || !password || password === "wrong") {
-      setFailed(true);
-      setAttemptsLeft((n) => Math.max(0, n - 1));
-      return;
+    setBusy(true);
+    setNotice("");
+    try {
+      if (!email || !password) {
+        setFailed(true);
+        setAttemptsLeft((n) => Math.max(0, n - 1));
+        return;
+      }
+      await login("admin", email.trim(), password);
+      navigate(location.state?.from?.pathname || "/admin", { replace: true });
+    } catch (err) {
+      const { credentials, text } = describeLoginError(err);
+      if (credentials) {
+        setFailed(true);
+        setAttemptsLeft((n) => Math.max(0, n - 1));
+      } else {
+        setNotice(text);
+      }
+    } finally {
+      setBusy(false);
     }
-    signIn("admin", email);
-    navigate(location.state?.from?.pathname || "/admin", { replace: true });
   }
 
   return (
@@ -46,9 +63,10 @@ export function AdminSignIn() {
       }
     >
       <form className="stack" onSubmit={handleSubmit}>
-        {failed ? (
+        {failed && !notice ? (
           <p className="notice notice-danger">Email or password is incorrect. Please try again.</p>
         ) : null}
+        {notice ? <p className="notice notice-danger">{notice}</p> : null}
         <FormField
           label="Work email"
           type="email"
@@ -64,8 +82,8 @@ export function AdminSignIn() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <Button type="submit" disabled={attemptsLeft === 0}>
-          {failed ? "Try again" : "Sign in securely"}
+        <Button type="submit" disabled={busy || attemptsLeft === 0}>
+          {busy ? "Signing in…" : failed ? "Try again" : "Sign in securely"}
         </Button>
         <Link className="link-button" to="/admin/forgot-password">
           Forgot password?

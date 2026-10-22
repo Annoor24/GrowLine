@@ -212,6 +212,31 @@ textarea {
   margin-top: 2px;
 }
 
+/* Strip across the top of a page that still shows sample data (only when the real backend is in use) */
+.main.has-banner > .sample-banner {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  margin: -28px -36px 0;
+  padding: 8px 36px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.main.has-banner .page-bar {
+  margin-top: 0;
+}
+
+.main.has-banner .page-header {
+  margin-top: 22px;
+}
+
+@media (max-width: 800px) {
+  .main.has-banner > .sample-banner {
+    margin: -20px -16px 0;
+    padding: 8px 16px;
+  }
+}
+
 /* White header bar used on list, form and detail pages (bleeds to the edges of the main area) */
 .page-bar {
   display: flex;

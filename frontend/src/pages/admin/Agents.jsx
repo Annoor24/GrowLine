@@ -62,17 +62,14 @@ export function AdminAgents() {
 
 export function AdminAgentProfile() {
   const { id } = useParams();
-  const { data, loading, error, reload } = useAsync(() => Promise.all([api.adminAgents(), api.adminFarmers()]), [id]);
-  if (loading || !data) return <Loading error={error} onRetry={reload} />;
-  const [agents, farmers] = data;
-  const agent = agents.find((item) => item.id === id);
-  if (!agent) return <p className="notice notice-warning">Agent not found.</p>;
+  const { data: agent, loading, error, reload } = useAsync(() => api.adminAgentDetail(id), [id]);
+  if (loading || !agent) return <Loading error={error} onRetry={reload} />;
 
   const columns = [
-    { key: "id", label: "Farmer ID" },
+    { key: "code", label: "Farmer ID" },
     { key: "name", label: "Farmer" },
     { key: "farms", label: "Farms" },
-    { key: "location", label: "Location" },
+    { key: "location", label: "LGA" },
   ];
   return (
     <div className="stack">
@@ -82,10 +79,10 @@ export function AdminAgentProfile() {
           <div className="kv">
             <strong>{agent.name}</strong>
             <span className="muted small">
-              Agent ID: {agent.id} • <StatusPill>{agent.status}</StatusPill> • {agent.email}
+              Agent ID: {agent.code} • <StatusPill>{agent.status}</StatusPill> • {agent.email}
             </span>
             <strong>
-              {agent.farmers} assigned farmers · {agent.farms} farms · {agent.advisories} advisories this month
+              {agent.farmers} assigned farmers · {agent.farms} farms · {agent.advisories} advisories
             </strong>
           </div>
           <div className="row">
@@ -96,8 +93,8 @@ export function AdminAgentProfile() {
           </div>
         </div>
       </Card>
-      <Card title="Assigned farmers" subtitle="Sample list">
-        <DataTable columns={columns} rows={farmers.slice(0, 3)} />
+      <Card title="Assigned farmers">
+        <DataTable columns={columns} rows={agent.farmerList} empty="No farmers are assigned to this agent yet." />
       </Card>
     </div>
   );
@@ -184,7 +181,7 @@ export function AgentSecurity() {
   const { data, loading, error, reload } = useAsync(api.adminAgents);
   const [sent, setSent] = useState(false);
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
-  const agent = data.find((item) => item.id === id);
+  const agent = data.find((item) => String(item.id) === id);
   if (!agent) return <p className="notice notice-warning">Agent not found.</p>;
   return (
     <div className="stack">

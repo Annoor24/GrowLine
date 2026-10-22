@@ -5,6 +5,7 @@ import FormField from "../../components/FormField.jsx";
 import Button from "../../components/Button.jsx";
 import { useAuth } from "../../auth/AuthContext.jsx";
 import { passwordMessage } from "../../utils/validate.js";
+import { describeLoginError } from "../../auth/loginErrors.js";
 
 const MIN_PASSWORD = 12;
 
@@ -17,25 +18,30 @@ const SAMPLE_INVITATION = {
 
 // MOCK: any email works; the password "wrong" simulates a failed login.
 export function AgentSignIn() {
-  const { signIn } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     if (!email || !password) {
       setError("Enter your email and password.");
       return;
     }
-    if (password === "wrong") {
-      setError("Email or password is incorrect. Please try again.");
-      return;
+    setBusy(true);
+    setError("");
+    try {
+      await login("agent", email.trim(), password);
+      navigate(location.state?.from?.pathname || "/agent", { replace: true });
+    } catch (err) {
+      setError(describeLoginError(err).text);
+    } finally {
+      setBusy(false);
     }
-    signIn("agent", email);
-    navigate(location.state?.from?.pathname || "/agent", { replace: true });
   }
 
   return (
@@ -64,7 +70,9 @@ export function AgentSignIn() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <Button type="submit">Sign in</Button>
+        <Button type="submit" disabled={busy}>
+          {busy ? "Signing in…" : "Sign in"}
+        </Button>
       </form>
     </AuthShell>
   );

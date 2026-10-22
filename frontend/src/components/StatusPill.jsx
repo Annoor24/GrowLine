@@ -10,6 +10,7 @@ const TONES = {
     "favourable",
     "safe to spray",
     "connected",
+    "onboarded",
   ],
   warning: [
     "pending",
