@@ -1,4 +1,4 @@
-import { accessToken } from "./session.js";
+import { accessToken, readSession, writeSession } from "./session.js";
 
 // VITE_API_URL is the backend address, e.g. https://growlineapi.example.com
 // When it is empty the app runs on the built-in sample data.
@@ -14,9 +14,39 @@ export class ApiError extends Error {
   }
 }
 
+// When the 1-day access token expires, swap the saved refresh token for a new pair (POST /refresh/).
+// Several requests can fail at once, so they all wait for the same renewal.
+let renewal = null;
+
+function renewTokens() {
+  const current = readSession();
+  if (!current?.refresh) return Promise.resolve(false);
+  if (!renewal) {
+    renewal = (async () => {
+      try {
+        const response = await fetch(`${BASE}/refresh/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh: current.refresh }),
+        });
+        if (!response.ok) return false;
+        const data = await response.json();
+        if (!data?.access) return false;
+        writeSession({ ...readSession(), access: data.access, refresh: data.refresh || current.refresh });
+        return true;
+      } catch {
+        return false;
+      } finally {
+        renewal = null;
+      }
+    })();
+  }
+  return renewal;
+}
+
 // options: { method, body, auth (default true), token (use this token instead of the saved one) }
 export async function request(path, options = {}) {
-  const { method = "GET", body, auth = true, token } = options;
+  const { method = "GET", body, auth = true, token, retried = false } = options;
 
   const headers = { "Content-Type": "application/json" };
   const bearer = token || (auth ? accessToken() : null);
@@ -41,8 +71,12 @@ export async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    // A saved token that the server rejects means the session ended: tell the app to sign out.
     if (response.status === 401 && auth && !token) {
+      // Try once to renew the tokens, then repeat the request.
+      if (!retried && (await renewTokens())) {
+        return request(path, { ...options, retried: true });
+      }
+      // Renewal failed: the session has ended, so tell the app to sign out.
       window.dispatchEvent(new Event("growline:unauthorized"));
     }
     throw new ApiError(response.status, data);

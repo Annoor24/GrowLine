@@ -21,14 +21,16 @@ export function AuthProvider({ children }) {
 
     const tokens = await request("/login/", { method: "POST", body: { email, password }, auth: false });
 
-    // The login response does not say whether the account is an admin or an agent.
-    // The admin-only stats endpoint answers 200 for an admin and 403 for anyone else.
-    let isAdmin = false;
-    try {
-      await request("/superadmin/farmers/stats/", { token: tokens.access });
-      isAdmin = true;
-    } catch (err) {
-      if (!(err instanceof ApiError) || err.status !== 403) throw err;
+    // The login response says "admin" or "agent". If an older backend leaves it out,
+    // ask the admin-only stats endpoint instead: 200 for an admin, 403 for anyone else.
+    let isAdmin = tokens.role === "admin";
+    if (!tokens.role) {
+      try {
+        await request("/superadmin/farmers/stats/", { token: tokens.access });
+        isAdmin = true;
+      } catch (err) {
+        if (!(err instanceof ApiError) || err.status !== 403) throw err;
+      }
     }
 
     if (role === "admin" && !isAdmin) throw new LoginProblem("not-admin");
