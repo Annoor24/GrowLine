@@ -21,7 +21,6 @@ export function AdminProfile() {
             <FormField label="Full name" value={data.name} readOnly />
             <FormField label="Email address" value={data.email} readOnly />
             <FormField label="Phone number" value={data.phone} readOnly />
-            <FormField label="Profile photo" value="Upload / replace photo" readOnly />
           </div>
           <div className="form-actions">
             <Button as={Link} to="/admin/profile/edit">
@@ -73,7 +72,6 @@ export function AdminEditProfile() {
             <FormField label="Full name" value={values.name} onChange={set("name")} error={errors.name} />
             <FormField label="Email address" type="email" value={values.email} onChange={set("email")} error={errors.email} />
             <FormField label="Phone number" value={values.phone} onChange={set("phone")} error={errors.phone} />
-            <FormField label="Profile photo" value="Upload / replace photo" readOnly />
           </div>
           <div className="form-actions">
             <Button onClick={save}>Save changes</Button>

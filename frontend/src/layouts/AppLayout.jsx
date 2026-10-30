@@ -13,8 +13,9 @@ const CONNECTED_PAGES = [
   /^\/admin\/farms(\/[^/]+)?$/,
 ];
 
-// nav / accountNav: [{ to, label, icon?, end? }]
-export default function AppLayout({ roleLabel, nav, accountNav = [], loginPath }) {
+// nav / accountNav: [{ to, label, icon?, end?, children?: [{ to, label }] }]
+// accountLink: when set, the account card at the bottom becomes a link (the agent's Settings).
+export default function AppLayout({ roleLabel, nav, accountNav = [], accountLink, loginPath }) {
   const { session, signOut } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -28,12 +29,17 @@ export default function AppLayout({ roleLabel, nav, accountNav = [], loginPath }
     navigate(loginPath, { replace: true });
   }
 
-  const renderLink = (item) => (
+  const renderLink = (item) => [
     <NavLink key={item.to} to={item.to} end={item.end}>
       <Icon name={item.icon} />
       {item.label}
-    </NavLink>
-  );
+    </NavLink>,
+    ...(item.children || []).map((child) => (
+      <NavLink key={child.to} to={child.to} className="nav-sub">
+        {child.label}
+      </NavLink>
+    )),
+  ];
 
   return (
     <div className="app">
@@ -71,10 +77,20 @@ export default function AppLayout({ roleLabel, nav, accountNav = [], loginPath }
           <button type="button" className="logout" onClick={handleLogout}>
             Log out
           </button>
-          <div className="account-chip">
-            <strong>{session?.name || "Account"}</strong>
-            {roleLabel}
-          </div>
+          {accountLink ? (
+            <NavLink className="account-chip" to={accountLink} onClick={() => setMenuOpen(false)}>
+              <Icon name="settings" />
+              <span>
+                <strong>Account (Settings)</strong>
+                {session?.name || roleLabel}
+              </span>
+            </NavLink>
+          ) : (
+            <div className="account-chip">
+              <strong>{session?.name || "Account"}</strong>
+              {roleLabel}
+            </div>
+          )}
         </div>
       </aside>
 

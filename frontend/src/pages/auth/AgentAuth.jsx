@@ -9,12 +9,9 @@ import { describeLoginError } from "../../auth/loginErrors.js";
 
 const MIN_PASSWORD = 12;
 
-// MOCK: the real invitation details (name, email, expiry) will come from the API using the link's token.
-const SAMPLE_INVITATION = {
-  firstName: "Fatima",
-  email: "fatima.musa@example.ng",
-  expires: "17 Oct 2026, 14:00 WAT",
-};
+// MOCK: the agent's first name will come from the API using the link's token.
+// The design review removed the email field and the expiry time (the expiry is in the email).
+const SAMPLE_INVITATION = { firstName: "Fatima" };
 
 // MOCK: any email works; the password "wrong" simulates a failed login.
 export function AgentSignIn() {
@@ -122,11 +119,10 @@ export function AgentActivate() {
       heading="Extension Agent · Activate Account"
       sub="Invitation-based first-time access."
       title={`Welcome to GrowLine, ${SAMPLE_INVITATION.firstName}`}
-      intro={`Your invitation is valid until ${SAMPLE_INVITATION.expires}.`}
+      intro="Create your password to get started."
       footer="Activation links can only be used once."
     >
       <form className="stack" onSubmit={handleSubmit}>
-        <FormField label="Work email" type="email" value={SAMPLE_INVITATION.email} readOnly />
         <FormField
           label="Create password"
           type="password"

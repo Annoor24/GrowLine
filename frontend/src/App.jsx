@@ -7,7 +7,7 @@ import { AdminSignIn, ForgotPassword, ResetLinkSent, SessionExpired, SetNewPassw
 
 import AgentOverview from "./pages/agent/Overview.jsx";
 import { AddAnotherFarm, AddFarm, ExistingFarmerFound, MyFarmers, MyFarms, RegisterFarmer } from "./pages/agent/Farmers.jsx";
-import { AlertMonitoring, SmsDetails, SmsHistory, SprayAdvisory } from "./pages/agent/Advisory.jsx";
+import { AlertMonitoring, DailyFeedback, FarmAdvisory, SmsDetails, SmsHistory } from "./pages/agent/Advisory.jsx";
 import { ComplaintThread, Complaints, NewComplaint, Notifications } from "./pages/agent/Support.jsx";
 import { ChangePassword, EditProfile, Profile, Settings } from "./pages/agent/Account.jsx";
 
@@ -22,7 +22,15 @@ const agentNav = [
   { to: "/agent", label: "Overview", icon: "overview", end: true },
   { to: "/agent/farmers", label: "My Farmers", icon: "farmers" },
   { to: "/agent/farms", label: "My Farms", icon: "farms" },
-  { to: "/agent/advisory", label: "Spray Advisory", icon: "advisory" },
+  {
+    to: "/agent/advisory",
+    label: "Advisory",
+    icon: "advisory",
+    children: [
+      { to: "/agent/advisory/daily", label: "Daily Feedback" },
+      { to: "/agent/advisory/farm", label: "Farm-Specific Advisory" },
+    ],
+  },
   { to: "/agent/alerts", label: "Alert Monitoring", icon: "alerts" },
   { to: "/agent/sms", label: "SMS History", icon: "history" },
   { to: "/agent/notifications", label: "Notifications", icon: "bell" },
@@ -39,12 +47,9 @@ const adminNav = [
   { to: "/admin/notifications", label: "Notifications", icon: "bell" },
   { to: "/admin/complaints", label: "Complaints & Support", icon: "help" },
   { to: "/admin/reports", label: "Reports & Analytics", icon: "reports" },
-];
-// The profile and settings frames in Figma show Settings under "Account".
-const adminAccountNav = [
-  { to: "/admin/profile", label: "My Profile", icon: "profile" },
   { to: "/admin/settings", label: "Settings", icon: "settings" },
 ];
+const adminAccountNav = [{ to: "/admin/profile", label: "My Profile", icon: "profile" }];
 
 export default function App() {
   return (
@@ -54,6 +59,8 @@ export default function App() {
       {/* Extension agent: public screens */}
       <Route path="/login" element={<AgentSignIn />} />
       <Route path="/activate/:token" element={<AgentActivate />} />
+      {/* The backend's invitation email links to /set-password?uid=…&token=… */}
+      <Route path="/set-password" element={<AgentActivate />} />
       <Route path="/activation-success" element={<ActivationSuccess />} />
       <Route path="/invitation-expired" element={<InvitationExpired />} />
 
@@ -68,7 +75,7 @@ export default function App() {
       <Route element={<RequireRole role="agent" loginPath="/login" />}>
         <Route
           path="/agent"
-          element={<AppLayout roleLabel="Extension Agent" nav={agentNav} loginPath="/login" />}
+          element={<AppLayout roleLabel="Extension Agent" nav={agentNav} accountLink="/agent/settings" loginPath="/login" />}
         >
           <Route index element={<AgentOverview />} />
           <Route path="farmers" element={<MyFarmers />} />
@@ -77,7 +84,9 @@ export default function App() {
           <Route path="farmers/:farmerId/farms/new" element={<AddAnotherFarm />} />
           <Route path="farms" element={<MyFarms />} />
           <Route path="farms/new" element={<AddFarm />} />
-          <Route path="advisory" element={<SprayAdvisory />} />
+          <Route path="advisory" element={<Navigate to="/agent/advisory/daily" replace />} />
+          <Route path="advisory/daily" element={<DailyFeedback />} />
+          <Route path="advisory/farm" element={<FarmAdvisory />} />
           <Route path="alerts" element={<AlertMonitoring />} />
           <Route path="sms" element={<SmsHistory />} />
           <Route path="sms/:id" element={<SmsDetails />} />

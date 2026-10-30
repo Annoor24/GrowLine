@@ -186,6 +186,25 @@ textarea {
   display: block;
 }
 
+/* The agent's account card opens Settings. */
+a.account-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+}
+
+a.account-chip:hover,
+a.account-chip.active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Sub-pages under a sidebar item (e.g. Advisory › Daily Feedback). */
+.nav a.nav-sub {
+  padding: 7px 10px 7px 36px;
+  font-size: 12.5px;
+}
+
 .main {
   padding: 28px 36px 48px;
   min-width: 0;
@@ -578,6 +597,10 @@ textarea.input {
 .notice-success {
   background: var(--green-100);
   color: var(--green-700);
+}
+
+.notice-info {
+  background: var(--neutral-bg);
 }
 
 .priority-list {

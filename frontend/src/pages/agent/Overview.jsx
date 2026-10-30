@@ -7,7 +7,7 @@ import DataTable from "../../components/DataTable.jsx";
 import Loading from "../../components/Loading.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import StatCard from "../../components/StatCard.jsx";
-import StatusPill from "../../components/StatusPill.jsx";
+import StatusPill, { ratingTone } from "../../components/StatusPill.jsx";
 
 export default function AgentOverview() {
   const { data, loading, error, reload } = useAsync(api.agentOverview);
@@ -17,7 +17,7 @@ export default function AgentOverview() {
   const columns = [
     { key: "farmer", label: "Farmer" },
     { key: "farmId", label: "Farm ID" },
-    { key: "risk", label: "Weather risk", render: (row) => <StatusPill>{row.risk}</StatusPill> },
+    { key: "rating", label: "Rating", render: (row) => <StatusPill tone={ratingTone(row.rating)}>{row.rating}</StatusPill> },
     { key: "sms", label: "SMS status", render: (row) => <StatusPill>{row.sms}</StatusPill> },
     { key: "api", label: "Weather API" },
     { key: "sentAt", label: "Sent at" },
@@ -59,26 +59,26 @@ export default function AgentOverview() {
       <div className="grid grid-2">
         <Card title="Farm advisory summary" subtitle={`${summary.total} monitored tomato farms`} actions={<StatusPill>Today</StatusPill>}>
           <div className="risk-bar">
-            <span style={{ flex: summary.favourable }} />
-            <span style={{ flex: summary.caution }} />
-            <span style={{ flex: summary.highRisk }} />
+            <span style={{ flex: summary.high }} />
+            <span style={{ flex: summary.moderate }} />
+            <span style={{ flex: summary.low }} />
           </div>
           <div className="row" style={{ marginTop: 12, gap: 32 }}>
             <div>
-              <div className="small muted">Favourable</div>
-              <strong>{summary.favourable}</strong>
+              <div className="small muted">High</div>
+              <strong>{summary.high}</strong>
             </div>
             <div>
-              <div className="small muted">Caution</div>
-              <strong>{summary.caution}</strong>
+              <div className="small muted">Moderate</div>
+              <strong>{summary.moderate}</strong>
             </div>
             <div>
-              <div className="small muted">High risk</div>
-              <strong>{summary.highRisk}</strong>
+              <div className="small muted">Low</div>
+              <strong>{summary.low}</strong>
             </div>
           </div>
           <p style={{ marginTop: 12 }}>
-            <Link className="link-button" to="/agent/advisory">
+            <Link className="link-button" to="/agent/advisory/daily">
               View farm advisories
             </Link>
           </p>
@@ -114,7 +114,7 @@ export default function AgentOverview() {
             <Button variant="soft" as={Link} to="/agent/farms/new">
               Add farm
             </Button>
-            <Button variant="soft" as={Link} to="/agent/advisory">
+            <Button variant="soft" as={Link} to="/agent/advisory/farm">
               Send SMS
             </Button>
           </div>

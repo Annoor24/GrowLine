@@ -75,7 +75,6 @@ export function EditProfile() {
             <FormField label="Full name" value={values.name} onChange={set("name")} error={errors.name} />
             <FormField label="Email address" type="email" value={values.email} onChange={set("email")} error={errors.email} />
             <FormField label="Phone number" value={values.phone} onChange={set("phone")} error={errors.phone} />
-            <FormField label="Profile photo" value="Upload / replace photo" readOnly />
           </div>
           <div className="form-actions">
             <Button onClick={save}>Save changes</Button>

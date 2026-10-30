@@ -180,6 +180,7 @@ export const api = {
   agentFarmers: sample(data.agentFarmers),
   agentFarms: sample(data.agentFarms),
   agentAdvisories: sample(data.agentAdvisories),
+  agentDailyFeedback: sample(data.agentDailyFeedback),
   agentSmsMessages: sample(data.agentSmsMessages),
   agentNotifications: sample(data.agentNotifications),
   agentComplaints: sample(data.agentComplaints),

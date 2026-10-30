@@ -10,7 +10,7 @@ export const agentOverview = {
   dateLabel: "Wednesday, 14 October 2026",
   area: "Ogun State",
   priorities: [
-    { tone: "danger", title: "3 farms have high-risk spray conditions", note: "Review advisories before recommending spraying" },
+    { tone: "danger", title: "3 farms have a Low spray rating", note: "Review advisories before recommending spraying" },
     { tone: "warning", title: "4 SMS messages failed", note: "Review delivery failures and retry eligible messages" },
   ],
   prioritiesBadge: "7 need attention",
@@ -20,12 +20,13 @@ export const agentOverview = {
     { label: "Advisories sent today", value: "28", note: "24 delivered · 4 failed" },
     { label: "Feedback response", value: "72%", note: "Last 7 days" },
   ],
-  summary: { total: 136, favourable: 92, caution: 30, highRisk: 14 },
+  // Spray rating per the design review: High (was Favourable), Moderate (was Caution), Low (was High risk).
+  summary: { total: 136, high: 92, moderate: 30, low: 14 },
   recent: [
-    { id: "r1", farmer: "Musa Bello", farmId: "FRM-0081", risk: "High risk", sms: "Delivered", api: "API A", sentAt: "10:42 AM" },
-    { id: "r2", farmer: "Bisi Adeoye", farmId: "FRM-0092", risk: "Caution", sms: "Failed", api: "API B", sentAt: "10:21 AM" },
-    { id: "r3", farmer: "Tunde Bakare", farmId: "FRM-0104", risk: "Favourable", sms: "Delivered", api: "API C", sentAt: "09:58 AM" },
-    { id: "r4", farmer: "Musa Bello", farmId: "FRM-0082", risk: "Caution", sms: "Queued", api: "API A", sentAt: "09:32 AM" },
+    { id: "r1", farmer: "Musa Bello", farmId: "FRM-0081", rating: "Low", sms: "Delivered", api: "API A", sentAt: "10:42 AM" },
+    { id: "r2", farmer: "Bisi Adeoye", farmId: "FRM-0092", rating: "Moderate", sms: "Failed", api: "API B", sentAt: "10:21 AM" },
+    { id: "r3", farmer: "Tunde Bakare", farmId: "FRM-0104", rating: "High", sms: "Delivered", api: "API C", sentAt: "09:58 AM" },
+    { id: "r4", farmer: "Musa Bello", farmId: "FRM-0082", rating: "Moderate", sms: "Pending", api: "API A", sentAt: "09:32 AM" },
   ],
   registration: { verified: 121, awaiting: 15 },
 };
@@ -42,15 +43,30 @@ export const agentFarms = [
   { id: "FARM-203", name: "East Plot", farmer: "Musa Ibrahim", farmerId: "FRM-1021", gps: "7.8031, 3.9655", crop: "Cocoa" },
 ];
 
+// Farm-Specific Advisory: the latest advisory for one farm.
+// "unchanged" stands in for the backend check that the advisory has not changed since the last SMS.
 export const agentAdvisories = [
-  { farmId: "FARM-201", label: "North Plot • FARM-201", directive: "Safe to spray", confidence: "High", smsStatus: "Not sent" },
-  { farmId: "FARM-202", label: "River Plot • FARM-202", directive: "Do not spray", confidence: "Moderate", smsStatus: "Not sent" },
+  { farmId: "FARM-201", label: "North Plot • FARM-201", farmerPhone: "+234 *** *** 0182", directive: "Safe to spray", confidence: "High", lastSms: "Previously sent • Awaiting verification", unchanged: true },
+  { farmId: "FARM-202", label: "River Plot • FARM-202", farmerPhone: "+234 *** *** 1038", directive: "Do not spray", confidence: "Moderate", lastSms: "Sent today, 09:45", unchanged: false },
+  { farmId: "FARM-203", label: "East Plot • FARM-203", farmerPhone: "+234 *** *** 7811", directive: "Spray with caution", confidence: "Low", lastSms: "No SMS sent yet", unchanged: false },
 ];
 
+// Daily Feedback: advisories fetched in the last 24 hours.
+// Feedback status is one of: Not collected, Accurate, Inaccurate.
+export const agentDailyFeedback = [
+  { id: "ADV-1", farm: "North Plot", farmId: "FARM-201", directive: "Safe to spray", fetched: "Today, 10:20 AM", feedback: "Not collected" },
+  { id: "ADV-2", farm: "Green Valley", farmId: "FARM-202", directive: "Do not spray", fetched: "Today, 9:45 AM", feedback: "Accurate" },
+  { id: "ADV-3", farm: "East Field", farmId: "FARM-203", directive: "Spray with caution", fetched: "Today, 6:30 AM", feedback: "Inaccurate" },
+  { id: "ADV-4", farm: "River Bend", farmId: "FARM-204", directive: "Safe to spray", fetched: "Yesterday, 5:10 PM", feedback: "Not collected" },
+];
+
+// Only spray advisories are sent by SMS. One row per SMS sent in the last 24 hours.
+// Status is one of: Delivered, Failed, Submitted, Pending.
 export const agentSmsMessages = [
-  { id: "SMS-1", message: "Spray advisory", date: "13 Oct", dateLong: "13 October 2026", recipients: 46, status: "Delivered", delivered: 44, pending: 2, failed: 0, text: "Conditions currently indicate a safe spray window." },
-  { id: "SMS-2", message: "Safety notice", date: "12 Oct", dateLong: "12 October 2026", recipients: 94, status: "Pending", delivered: 80, pending: 14, failed: 0, text: "Avoid spraying during the afternoon due to high wind." },
-  { id: "SMS-3", message: "Rain update", date: "10 Oct", dateLong: "10 October 2026", recipients: 94, status: "Delivered", delivered: 94, pending: 0, failed: 0, text: "Light rain expected tomorrow morning." },
+  { id: "SMS-1", message: "Spray advisory", farmer: "Musa Ibrahim", farmId: "FARM-201", farm: "North Plot", sentAt: "Today, 10:42", sentLong: "14 October 2026, 10:42", status: "Delivered", directive: "Safe to spray", rating: "High", text: "Conditions currently indicate a safe spray window." },
+  { id: "SMS-2", message: "Spray advisory", farmer: "Musa Ibrahim", farmId: "FARM-202", farm: "River Plot", sentAt: "Today, 09:45", sentLong: "14 October 2026, 09:45", status: "Submitted", directive: "Do not spray", rating: "Moderate", text: "Do not spray today. Rain is likely within 6 hours of spraying." },
+  { id: "SMS-3", message: "Spray advisory", farmer: "Hauwa Bello", farmId: "FARM-203", farm: "East Plot", sentAt: "Today, 06:30", sentLong: "14 October 2026, 06:30", status: "Failed", directive: "Spray with caution", rating: "Moderate", text: "Spray with caution. Wind is moderate; spray early in the morning." },
+  { id: "SMS-4", message: "Spray advisory", farmer: "Rashid Sani", farmId: "FARM-204", farm: "River Bend", sentAt: "Yesterday, 17:10", sentLong: "13 October 2026, 17:10", status: "Pending", directive: "Safe to spray", rating: "High", text: "Conditions currently indicate a safe spray window." },
 ];
 
 export const agentNotifications = [
@@ -103,10 +119,10 @@ export const adminOverview = {
     { label: "Registered farms", value: "1,680", note: "1.4 farms per farmer" },
     { label: "Verified farm GPS", value: "1,512", note: "168 require verification" },
     { label: "Active weather APIs", value: "3 / 3", note: "A, B and C operational", tone: "good" },
-    { label: "Alerts generated", value: "1,000", note: "Last 7 days" },
+    { label: "SMS generated", value: "1,000", note: "Last 7 days" },
     { label: "SMS delivered", value: "940", note: "94.0% delivery rate", tone: "good" },
     { label: "SMS failed", value: "35", note: "3.5% require review", tone: "bad" },
-    { label: "Farmer responses", value: "376", note: "40.0% of delivered" },
+    { label: "Farmers feedback", value: "376", note: "40.0% of delivered" },
   ],
   apiPerformance: [
     { id: "A", api: "API A", farmers: 400, alerts: 330, delivered: 315, failed: 10, pending: 5, accuracy: "81%" },

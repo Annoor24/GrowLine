@@ -35,8 +35,16 @@ const TONES = {
     "delivery failed",
     "high",
   ],
-  info: ["in progress", "sent"],
+  info: ["in progress", "sent", "submitted"],
 };
+
+// Spray rating (forecast confidence for the SMS): High, Moderate, Low.
+// Kept separate because "High" means a good rating here but high priority elsewhere.
+const RATING_TONES = { high: "success", moderate: "warning", low: "danger" };
+
+export function ratingTone(rating) {
+  return RATING_TONES[String(rating).toLowerCase()] || "neutral";
+}
 
 function toneFor(label) {
   const key = String(label).toLowerCase();
