@@ -41,7 +41,7 @@
   color: var(--muted);
 }
 
-.eyebrow {
+.public .eyebrow {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -50,7 +50,7 @@
   margin-bottom: 8px;
 }
 
-.eyebrow-light {
+.public .eyebrow-light {
   color: #b9e07a;
 }
 
@@ -59,12 +59,12 @@
   margin-bottom: 24px;
 }
 
-.btn-lime {
+.btn.btn-lime {
   background: #b9e07a;
   color: var(--green-700);
 }
 
-.btn-lime:hover {
+.btn.btn-lime:hover {
   background: #a8d462;
 }
 
@@ -560,7 +560,7 @@
     margin-left: auto;
   }
 
-  .public-cta {
+  .public-header .public-cta {
     display: none;
   }
 
