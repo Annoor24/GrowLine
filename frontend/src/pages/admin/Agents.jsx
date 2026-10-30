@@ -89,12 +89,137 @@ export function AdminAgentProfile() {
             <Button variant="secondary" as={Link} to={`/admin/agents/${agent.id}/security`}>
               Account & password
             </Button>
-            <Button>Reassign farmers</Button>
+            <Button as={Link} to={`/admin/agents/${agent.id}/assign`}>
+              Reassign farmers
+            </Button>
           </div>
         </div>
       </Card>
       <Card title="Assigned farmers">
         <DataTable columns={columns} rows={agent.farmerList} empty="No farmers are assigned to this agent yet." />
+      </Card>
+    </div>
+  );
+}
+
+// NOT IN THE DESIGN: requested in review comment #15. Assign or unassign farmers for one agent,
+// including farmers who registered themselves on the website and have no agent yet.
+// Changes are kept on this page only until the backend has an assignment endpoint.
+export function AssignFarmers() {
+  const { id } = useParams();
+  const { data: agent, loading, error, reload } = useAsync(() => api.adminAgentDetail(id), [id]);
+  const farmers = useAsync(api.adminFarmerAssignments);
+  const agents = useAsync(api.adminAgents);
+  const [changes, setChanges] = useState({});
+  const [picked, setPicked] = useState({ assigned: [], unassigned: [] });
+  const [moveTo, setMoveTo] = useState("");
+  const [notice, setNotice] = useState("");
+
+  if (loading || !agent) return <Loading error={error} onRetry={reload} />;
+  if (farmers.loading || !farmers.data) return <Loading error={farmers.error} onRetry={farmers.reload} />;
+
+  // The sample assignments use the sample agent IDs; the agent on this page is matched by its code.
+  const agentKey = agent.code;
+  const rows = farmers.data.map((f) => ({ ...f, agentId: f.id in changes ? changes[f.id] : f.agentId }));
+  const assigned = rows.filter((f) => f.agentId === agentKey);
+  const unassigned = rows.filter((f) => !f.agentId);
+  const otherAgents = (agents.data || []).filter((a) => a.id !== agentKey && a.status !== "Inactive");
+
+  const toggle = (list, farmerId) => {
+    const current = picked[list];
+    const next = current.includes(farmerId) ? current.filter((x) => x !== farmerId) : [...current, farmerId];
+    setPicked({ ...picked, [list]: next });
+  };
+
+  function apply(ids, newAgentId, message) {
+    const next = { ...changes };
+    ids.forEach((farmerId) => {
+      next[farmerId] = newAgentId;
+    });
+    setChanges(next);
+    setPicked({ assigned: [], unassigned: [] });
+    setNotice(message);
+  }
+
+  const checkColumn = (list) => ({
+    key: "pick",
+    label: "",
+    render: (row) => (
+      <input
+        type="checkbox"
+        aria-label={`Select ${row.name}`}
+        checked={picked[list].includes(row.id)}
+        onChange={() => toggle(list, row.id)}
+      />
+    ),
+  });
+  const baseColumns = [
+    { key: "id", label: "Farmer ID" },
+    { key: "name", label: "Farmer" },
+    { key: "farms", label: "Farms" },
+    { key: "location", label: "LGA" },
+  ];
+  const sourceColumn = {
+    key: "source",
+    label: "Registered by",
+    render: (row) => <StatusPill tone={row.source === "Website" ? "info" : "neutral"}>{row.source === "Website" ? "Self (website)" : "Agent"}</StatusPill>,
+  };
+
+  const count = (n) => `${n} farmer${n === 1 ? "" : "s"}`;
+  const movingAgent = otherAgents.find((a) => a.id === moveTo);
+
+  return (
+    <div className="stack">
+      <PageHeader bar="Admin" title="Assign farmers" subtitle={`Assign or unassign farmers for ${agent.name} (${agent.code})`} />
+      <div>
+        <Button variant="secondary" as={Link} to={`/admin/agents/${agent.id}`}>
+          ‹ Back to agent profile
+        </Button>
+      </div>
+      {notice ? <p className="notice notice-success">{notice}</p> : null}
+
+      <Card title={`Assigned to ${agent.name}`} subtitle="Select farmers to unassign or move to another agent">
+        <DataTable columns={[checkColumn("assigned"), ...baseColumns]} rows={assigned} empty="No farmers are assigned to this agent." />
+        <div className="form-actions" style={{ alignItems: "flex-end" }}>
+          <Button
+            variant="secondary"
+            disabled={picked.assigned.length === 0}
+            onClick={() => apply(picked.assigned, null, `${count(picked.assigned.length)} unassigned from ${agent.name}.`)}
+          >
+            Unassign selected
+          </Button>
+          <div style={{ minWidth: 220 }}>
+            <FormField
+              label="Move to agent"
+              kind="select"
+              value={moveTo}
+              onChange={(e) => setMoveTo(e.target.value)}
+              options={[{ value: "", label: "Choose an agent" }, ...otherAgents.map((a) => ({ value: a.id, label: a.name }))]}
+            />
+          </div>
+          <Button
+            disabled={picked.assigned.length === 0 || !movingAgent}
+            onClick={() => apply(picked.assigned, moveTo, `${count(picked.assigned.length)} moved to ${movingAgent.name}.`)}
+          >
+            Move selected
+          </Button>
+        </div>
+      </Card>
+
+      <Card title="Farmers without an agent" subtitle="Includes farmers who registered themselves on the website">
+        <DataTable
+          columns={[checkColumn("unassigned"), ...baseColumns, sourceColumn]}
+          rows={unassigned}
+          empty="Every farmer has an agent."
+        />
+        <div className="form-actions">
+          <Button
+            disabled={picked.unassigned.length === 0}
+            onClick={() => apply(picked.unassigned, agentKey, `${count(picked.unassigned.length)} assigned to ${agent.name}.`)}
+          >
+            Assign selected to {agent.name}
+          </Button>
+        </div>
       </Card>
     </div>
   );

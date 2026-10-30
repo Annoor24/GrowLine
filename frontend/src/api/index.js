@@ -168,6 +168,7 @@ export const api = {
 
   // ---------- Not connected yet (no backend endpoint): always sample data ----------
   adminOverview: sample(data.adminOverview),
+  adminFarmerAssignments: sample(data.adminFarmerAssignments),
   adminProfile: sample(data.adminProfile),
   adminAlerts: sample(data.adminAlerts),
   adminAlertDetail: sample(data.adminAlertDetail),

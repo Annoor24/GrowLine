@@ -180,6 +180,17 @@ export const adminAgents = [
   { id: "AGT-0045", name: "Tayo Ali", email: "tayo@example.com", farmers: 0, farms: 0, advisories: 0, status: "Inactive", area: "Zaria" },
 ];
 
+// Who each farmer is assigned to. agentId null = unassigned (e.g. registered themselves on the website).
+// source: "Agent" (registered by an agent) or "Website" (self-registered).
+export const adminFarmerAssignments = [
+  { id: "FRM-1021", name: "Musa Ibrahim", location: "Iseyin", farms: 3, agentId: "AGT-0042", source: "Agent" },
+  { id: "FRM-1022", name: "Hauwa Bello", location: "Oyo East", farms: 2, agentId: "AGT-0042", source: "Agent" },
+  { id: "FRM-1023", name: "Rashid Sani", location: "Akinyele", farms: 1, agentId: "AGT-0042", source: "Agent" },
+  { id: "FRM-1031", name: "Bisi Adeoye", location: "Ogbomoso North", farms: 1, agentId: null, source: "Website" },
+  { id: "FRM-1032", name: "Tunde Bakare", location: "Ibarapa East", farms: 2, agentId: null, source: "Website" },
+  { id: "FRM-1033", name: "Kemi Olawale", location: "Iseyin", farms: 1, agentId: "AGT-0043", source: "Agent" },
+];
+
 export const adminInvitations = [
   { id: "AG-012", agent: "AG-012 · Ibrahim Yusuf", area: "Kano Municipal", invitation: "Active", sent: "12 Oct 2026", action: "View agent" },
   { id: "AG-018", agent: "AG-018 · Fatima Musa", area: "Kaduna North", invitation: "Pending", sent: "15 Oct 2026", action: "Resend invite" },

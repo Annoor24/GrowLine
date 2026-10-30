@@ -13,7 +13,7 @@ import { ChangePassword, EditProfile, Profile, Settings } from "./pages/agent/Ac
 
 import AdminOverview from "./pages/admin/Overview.jsx";
 import { AdminFarmDetail, AdminFarmerDetail, AdminFarmers, AdminFarms } from "./pages/admin/People.jsx";
-import { AdminAgentProfile, AdminAgents, AgentInvitations, AgentSecurity, CreateAgent } from "./pages/admin/Agents.jsx";
+import { AdminAgentProfile, AdminAgents, AgentInvitations, AgentSecurity, AssignFarmers, CreateAgent } from "./pages/admin/Agents.jsx";
 import { AlertDetail, Reports, SmsMonitoring } from "./pages/admin/Monitoring.jsx";
 import { AdminComplaintDetail, AdminComplaints, AdminNotifications, ComposeNotification } from "./pages/admin/Support.jsx";
 import { AdminEditProfile, AdminProfile, AdminSettings } from "./pages/admin/Account.jsx";
@@ -120,6 +120,7 @@ export default function App() {
           <Route path="agents/invitations" element={<AgentInvitations />} />
           <Route path="agents/:id" element={<AdminAgentProfile />} />
           <Route path="agents/:id/security" element={<AgentSecurity />} />
+          <Route path="agents/:id/assign" element={<AssignFarmers />} />
           <Route path="farmers" element={<AdminFarmers />} />
           <Route path="farmers/:id" element={<AdminFarmerDetail />} />
           <Route path="farms" element={<AdminFarms />} />
