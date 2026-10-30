@@ -187,7 +187,21 @@ export const api = {
   agentComplaints: sample(data.agentComplaints),
   agentProfile: sample(data.agentProfile),
 
-  // ---------- Public forms (no backend endpoint yet): accept and do nothing ----------
-  registerFarmer: (payload) => delay({ ok: true, payload }),
+  // ---------- Public farmer registration (no login) ----------
+  // Step 1: the farmer's details. Returns { token, expires_in } for step 2.
+  registerFarmerDetails: live(
+    (body) => request("/register/farmer/", { method: "POST", body, auth: false }),
+    () => ({ token: "sample-token", expires_in: 7200 }),
+  ),
+  // Step 2: one or more farms. The backend builds each farm's polygon from the point and size.
+  registerFarms: live(
+    (token, farms) => request("/register/farm/", { method: "POST", body: { token, farms }, auth: false }),
+    (token, farms) => ({
+      farms: farms.map((_, i) => ({ code: `FM-S00${i + 1}`, name: `Farm ${i + 1}`, duplicate: false })),
+      farms_registered: farms.length,
+    }),
+  ),
+
+  // ---------- Agent application (no backend endpoint yet): accept and do nothing ----------
   applyAgent: (payload) => delay({ ok: true, payload }),
 };

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/index.js";
+import { ApiError } from "../../api/client.js";
 import Button from "../../components/Button.jsx";
 import FormField from "../../components/FormField.jsx";
 import StepTabs from "../../components/StepTabs.jsx";
@@ -9,12 +10,48 @@ import PublicLayout from "../../layouts/PublicLayout.jsx";
 import { isNigerianPhone } from "../../utils/validate.js";
 import { STATES, choose } from "./options.js";
 
-const LANGUAGES = ["English", "Yoruba", "Pidgin"];
+// The backend accepts English and Yoruba for now (Pidgin is not supported yet).
+const LANGUAGES = [
+  { value: "", label: "English / Yoruba" },
+  { value: "en", label: "English" },
+  { value: "yo", label: "Yoruba" },
+];
 const UNITS = ["Plots", "Acres", "Hectares"];
-// A reading less precise than this is treated as a weak GPS signal.
+// Above WEAK the farmer is asked to try for a better reading; above MAX the backend rejects it.
 const WEAK_GPS_METRES = 50;
+const MAX_GPS_METRES = 500;
 
 const STEPS = ["01 About you", "02 Mark your farm and tell us your farm size"];
+
+// Backend field name -> form field name, for showing 400 errors next to the right input.
+const ABOUT_FIELDS = {
+  full_name: "name",
+  phone_e164: "phone",
+  state: "state",
+  lga: "lga",
+  town_or_village: "town",
+  language: "language",
+  consent: "consent",
+};
+const FARM_FIELDS = { lat: "location", lng: "location", gps_accuracy_m: "location", size_value: "size", size_unit: "unit" };
+
+// { full_name: ["This field is required."] } -> { name: "This field is required." }
+function fieldErrors(err, map) {
+  const data = err?.data;
+  const out = {};
+  if (!data || typeof data !== "object") return out;
+  Object.entries(map).forEach(([apiKey, formKey]) => {
+    const value = data[apiKey];
+    if (value && !out[formKey]) out[formKey] = Array.isArray(value) ? value[0] : String(value);
+  });
+  return out;
+}
+
+function problemMessage(err) {
+  if (err instanceof ApiError && err.status === 429) return "Too many attempts. Please wait a while and try again.";
+  if (err instanceof ApiError && err.status === 0) return "We could not reach GrowLine. Check your internet connection and try again.";
+  return "Something went wrong. Please try again.";
+}
 
 // One farm on step 2: size, unit and its own GPS point.
 function FarmBlock({ index, farm, onChange, onRemove, errors }) {
@@ -26,16 +63,20 @@ function FarmBlock({ index, farm, onChange, onRemove, errors }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gps]);
 
-  const weak = gps.status === "ok" && gps.accuracy > WEAK_GPS_METRES;
-  const saved = farm.location && !weak;
+  const accuracy = farm.location?.accuracy;
+  const tooWeak = accuracy > MAX_GPS_METRES;
+  const weak = !tooWeak && accuracy > WEAK_GPS_METRES;
+  const saved = farm.location && !tooWeak;
 
   let state;
   if (gps.status === "waiting") {
     state = { tone: "info", title: "Finding your farm…", text: "Please stay where you are while your phone finds your location." };
   } else if (gps.status === "error") {
     state = { tone: "danger", title: "Location permission denied", text: "Allow location in your browser settings, then try again." };
-  } else if (weak) {
+  } else if (tooWeak) {
     state = { tone: "warning", title: "Weak GPS signal", text: "Move to an open area away from tall trees or buildings, then try again." };
+  } else if (weak) {
+    state = { tone: "warning", title: "Farm location saved", text: "The signal was weak. For a better reading, move to an open area and tap again." };
   } else if (saved) {
     state = { tone: "success", title: "Farm location saved", text: "Your farm pin has been saved." };
   }
@@ -82,7 +123,7 @@ function FarmBlock({ index, farm, onChange, onRemove, errors }) {
           <h4>Mark your farm location</h4>
           <p>We will capture your phone's GPS position. A location pin will appear here when your location is found.</p>
           <Button onClick={capture} disabled={gps.status === "waiting"}>
-            {gps.status === "error" || weak ? "Try again" : saved ? "Mark again" : "Tap here to mark my farm"}
+            {gps.status === "error" || tooWeak ? "Try again" : saved ? "Mark again" : "Tap here to mark my farm"}
           </Button>
         </div>
         <div className="preview-panel" aria-live="polite">
@@ -99,7 +140,7 @@ function FarmBlock({ index, farm, onChange, onRemove, errors }) {
         </div>
       </div>
       {errors?.location ? <span className="error-text">{errors.location}</span> : null}
-      {gps.status === "error" || weak ? (
+      {gps.status === "error" || tooWeak || weak ? (
         <p className="small muted">Still having trouble? Ask your Extension Agent for help capturing your farm location.</p>
       ) : null}
     </div>
@@ -117,6 +158,8 @@ export default function RegisterFarm() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  // Returned by step 1 and sent with the farms in step 2. Valid for 2 hours.
+  const [token, setToken] = useState("");
 
   const set = (key) => (event) => {
     const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
@@ -124,19 +167,38 @@ export default function RegisterFarm() {
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
 
-  function continueToGps(event) {
+  async function continueToGps(event) {
     event.preventDefault();
     const next = {};
     if (!about.name.trim()) next.name = "Enter your full name.";
     if (!isNigerianPhone(about.phone)) next.phone = "Use a Nigerian mobile number, e.g. 0803 123 4567.";
     if (!about.state) next.state = "Choose your state.";
     if (!about.lga.trim()) next.lga = "Enter your Local Government Area.";
-    if (!about.town.trim()) next.town = "Enter your town or village.";
     if (!about.consent) next.consent = "Tick the box to agree before you continue.";
     setErrors(next);
-    if (Object.keys(next).length === 0) {
+    setSubmitError("");
+    if (Object.keys(next).length > 0) return;
+
+    setSubmitting(true);
+    try {
+      const result = await api.registerFarmerDetails({
+        full_name: about.name.trim(),
+        phone_e164: about.phone.replace(/\s+/g, ""),
+        state: about.state,
+        lga: about.lga.trim(),
+        town_or_village: about.town.trim() || undefined,
+        language: about.language || "en",
+        consent: true,
+      });
+      setToken(result.token);
       setStep(1);
       window.scrollTo(0, 0);
+    } catch (err) {
+      const fields = fieldErrors(err, ABOUT_FIELDS);
+      setErrors(fields);
+      if (Object.keys(fields).length === 0) setSubmitError(problemMessage(err));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -146,32 +208,39 @@ export default function RegisterFarm() {
       if (!(Number(farm.size) > 0)) e.size = "Enter the farm size.";
       if (!farm.unit) e.unit = "Choose a unit.";
       if (!farm.location) e.location = "Mark the farm location before you register.";
-      else if (farm.location.accuracy > WEAK_GPS_METRES) e.location = "The GPS signal was weak. Mark the farm again.";
+      else if (farm.location.accuracy > MAX_GPS_METRES) e.location = "The GPS signal is too weak. Move to an open area and mark the farm again.";
       return e;
     });
     setErrors({ farms: farmErrors });
+    setSubmitError("");
     if (farmErrors.some((e) => Object.keys(e).length > 0)) return;
 
-    // Both steps are sent together in one request.
-    const payload = {
-      ...about,
-      farms: farms.map(({ size, unit, location }) => ({
-        size: Number(size),
-        unit: unit.toLowerCase(),
-        latitude: location.latitude,
-        longitude: location.longitude,
-        accuracy_m: Math.round(location.accuracy),
-        captured_at: location.capturedAt,
-      })),
-    };
     setSubmitting(true);
-    setSubmitError("");
     try {
-      await api.registerFarmer(payload);
+      await api.registerFarms(
+        token,
+        farms.map(({ size, unit, location }) => ({
+          lat: location.latitude,
+          lng: location.longitude,
+          gps_accuracy_m: Math.round(location.accuracy),
+          size_value: Number(size),
+          size_unit: unit.toLowerCase(),
+        })),
+      );
       setDone(true);
       window.scrollTo(0, 0);
-    } catch {
-      setSubmitError("We could not send your registration. Check your connection and try again.");
+    } catch (err) {
+      const data = err instanceof ApiError ? err.data : null;
+      if (data?.token) {
+        // Expired or invalid token: step 1 again gives a new one. The farmer's details are kept.
+        setStep(0);
+        setSubmitError("Your session expired. Check your details and tap “Save and continue to GPS” again. Your farms are kept.");
+        window.scrollTo(0, 0);
+      } else if (Array.isArray(data?.farms)) {
+        setErrors({ farms: data.farms.map((farmError) => fieldErrors({ data: farmError }, FARM_FIELDS)) });
+      } else {
+        setSubmitError(problemMessage(err));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -217,7 +286,7 @@ export default function RegisterFarm() {
                 <FormField label="Phone number for SMS" type="tel" placeholder="e.g. 08031234567" value={about.phone} onChange={set("phone")} error={errors.phone} autoComplete="tel" />
                 <FormField label="State" kind="select" value={about.state} onChange={set("state")} options={choose("Select state", STATES)} error={errors.state} />
                 <FormField label="Local Government Area" placeholder="Enter your LGA" value={about.lga} onChange={set("lga")} error={errors.lga} />
-                <FormField label="Town or village" placeholder="Enter your town or village" value={about.town} onChange={set("town")} error={errors.town} />
+                <FormField label="Town or village (optional)" placeholder="Enter your town or village" value={about.town} onChange={set("town")} error={errors.town} />
               </div>
               <div className="form-grid">
                 <FormField
@@ -225,7 +294,8 @@ export default function RegisterFarm() {
                   kind="select"
                   value={about.language}
                   onChange={set("language")}
-                  options={choose("English / Yoruba / Pidgin", LANGUAGES)}
+                  options={LANGUAGES}
+                  error={errors.language}
                 />
               </div>
               <label className="check">
@@ -240,8 +310,11 @@ export default function RegisterFarm() {
                 <strong>Before you continue</strong>
                 <div>Be at your farm for the next step. You will need to allow location access on your phone.</div>
               </div>
+              {submitError ? <p className="notice notice-danger">{submitError}</p> : null}
               <div className="form-actions end">
-                <Button type="submit">Save and continue to GPS</Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Saving…" : "Save and continue to GPS"}
+                </Button>
               </div>
             </form>
           </>
