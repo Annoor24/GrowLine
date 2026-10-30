@@ -35,13 +35,31 @@ export const directiveLabel = (raw) => (raw ? DIRECTIVE_LABELS[raw] || titleCase
 // Agent complaints: the API returns stored values, the page shows friendlier labels.
 export const COMPLAINT_STATUS_LABELS = { pending: "Open", on_going: "In progress", closed: "Resolved" };
 
+// Agent lists call the code "ticket" or "code" depending on the endpoint; admin rows add agent_name.
 export const complaintRow = (c) => ({
   id: c.id,
-  ticket: c.ticket,
+  ticket: c.ticket || c.code,
   subject: c.subject,
+  agent: c.agent_name || "—",
   created: formatDate(c.created_at),
   priority: c.priority_display || titleCase(c.priority),
+  priorityValue: c.priority,
   status: COMPLAINT_STATUS_LABELS[c.status] || c.status_display || titleCase(c.status),
+  statusValue: c.status,
+});
+
+// A complaint with its conversation (follow_ups, oldest first).
+export const complaintThread = (c) => ({
+  ...complaintRow(c),
+  messages: (c.follow_ups || []).map(followUpMessage),
+});
+
+export const followUpMessage = (f) => ({
+  id: f.id,
+  role: f.sender_role,
+  from: f.sender_role === "superadmin" ? "Super Admin" : f.sender_name || "Agent",
+  when: formatWhen(f.created_at),
+  text: f.message,
 });
 
 export function formatWhen(iso) {

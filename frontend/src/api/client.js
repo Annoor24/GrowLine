@@ -92,6 +92,11 @@ export async function fetchAllPages(path, maxPages = 10) {
   for (let i = 0; i < maxPages && next; i += 1) {
     const page = await request(next);
     if (!first) first = page;
+    // Without pagination switched on, Django REST returns a plain array instead of a page.
+    if (Array.isArray(page)) {
+      rows.push(...page);
+      break;
+    }
     rows.push(...(page.results || []));
     // "next" is an absolute address; keep only the path and query so the request goes via BASE.
     next = page.next ? new URL(page.next).pathname + new URL(page.next).search : null;

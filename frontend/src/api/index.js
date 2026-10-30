@@ -1,9 +1,11 @@
 import * as data from "../mocks/data.js";
-import { fetchAllPages, request, USE_MOCKS } from "./client.js";
+import { ApiError, fetchAllPages, request, USE_MOCKS } from "./client.js";
 import {
   agentDetail,
   agentRow,
   complaintRow,
+  complaintThread,
+  followUpMessage,
   farmDetail,
   farmRow,
   farmSummaryTiles,
@@ -22,8 +24,9 @@ import {
 // matching `sample(...)` line into a `live(...)` one with an adapter from adapters.js.
 const delay = (value) => new Promise((resolve) => setTimeout(() => resolve(value), 120));
 const sample = (value) => () => delay(value);
+// Sample errors (e.g. "not found") come back as a rejected promise, like a failed request.
 const live = (liveFn, sampleFn) => (...args) =>
-  USE_MOCKS ? delay(sampleFn(...args)) : liveFn(...args);
+  USE_MOCKS ? Promise.resolve().then(() => sampleFn(...args)).then(delay) : liveFn(...args);
 
 // ---- sample data reshaped like the adapters' output ----
 const asCode = (row) => ({ ...row, code: row.id });
@@ -112,24 +115,46 @@ const sampleFarmDetail = (id) => {
   };
 };
 
-const sampleComplaintStats = (rows) => ({
-  total_submitted: rows.length,
-  open: rows.filter((c) => c.status === "pending").length,
-  in_progress: rows.filter((c) => c.status === "on_going").length,
-  resolved: rows.filter((c) => c.status === "closed").length,
-});
+// ---- complaints: sample versions that mirror the backend, working on one shared list ----
+// The sample agent is the first one in the list; the admin sees everyone's complaints.
+const SAMPLE_AGENT = "Amina Yusuf";
+const myComplaints = () => data.complaintStore.filter((c) => c.agent_name === SAMPLE_AGENT);
+const countBy = (rows, status) => rows.filter((c) => c.status === status).length;
 
-// Mirrors the backend: search on ticket or subject, filter by status, newest first, then limit.
-const sampleMyComplaints = (rows, { search = "", status = "", limit } = {}) => {
+function findComplaint(code) {
+  const found = data.complaintStore.find((c) => c.code.toLowerCase() === String(code).toLowerCase());
+  if (!found) throw new ApiError(404, { detail: "Not found." });
+  return found;
+}
+
+// Search on ticket or subject (and agent name for admins), filters, newest first, then limit.
+function filterComplaints(rows, { search = "", status = "", priority = "" } = {}) {
   const term = search.toLowerCase();
-  const matching = rows.filter(
+  return rows.filter(
     (c) =>
       (!status || c.status === status) &&
-      (!term || c.ticket.toLowerCase().includes(term) || c.subject.toLowerCase().includes(term)),
+      (!priority || c.priority === priority) &&
+      (!term || [c.code, c.subject, c.agent_name].some((value) => value.toLowerCase().includes(term))),
   );
+}
+
+const sampleMyComplaints = ({ limit, ...filters } = {}) => {
+  const matching = filterComplaints(myComplaints(), filters);
   const shown = limit ? matching.slice(0, limit) : matching;
   return { total: matching.length, showing: shown.length, rows: shown.map(complaintRow) };
 };
+
+let sampleCounter = 300;
+const now = () => new Date().toISOString();
+const sampleReply = (code, message, role) => {
+  const target = findComplaint(code);
+  const entry = { id: `${code}-${target.follow_ups.length + 1}`, sender_role: role, sender_name: role === "agent" ? SAMPLE_AGENT : "Super Admin", created_at: now(), message };
+  target.follow_ups.push(entry);
+  return entry;
+};
+
+// Responses are either wrapped as { message, data } or bare, depending on the endpoint.
+const unwrap = (res) => (res && "data" in res && "message" in res ? res.data : res);
 
 const sampleFarmerTiles = [
   { label: "Farmers", value: "1,200", note: "Unique farmer profiles" },
@@ -193,9 +218,44 @@ export const api = {
   adminAlerts: sample(data.adminAlerts),
   adminAlertDetail: sample(data.adminAlertDetail),
   adminReports: sample(data.adminReports),
-  adminComplaints: sample(data.adminComplaints),
-  adminComplaintStats: sample(data.adminComplaintStats),
   adminNotifications: sample(data.adminNotifications),
+
+  // ---------- Complaints: super admin ----------
+  adminComplaintStats: live(
+    async () => unwrap(await request("/admin/complaints/stats/")),
+    () => ({
+      open_complaints: countBy(data.complaintStore, "pending"),
+      in_progress: countBy(data.complaintStore, "on_going"),
+      resolved: countBy(data.complaintStore, "closed"),
+      high_priority: data.complaintStore.filter((c) => c.priority === "high" && c.status !== "closed").length,
+    }),
+  ),
+  adminComplaints: live(
+    async ({ search = "", status = "", priority = "" } = {}) => {
+      const params = new URLSearchParams({ ordering: "-created_at" });
+      if (search) params.set("search", search);
+      if (status) params.set("status", status);
+      if (priority) params.set("priority", priority);
+      const { rows } = await fetchAllPages(`/admin/complaints/?${params}`);
+      return rows.map(complaintRow);
+    },
+    (filters) => filterComplaints(data.complaintStore, filters).map(complaintRow),
+  ),
+  adminComplaintDetail: live(
+    async (code) => complaintThread(unwrap(await request(`/admin/complaints/${encodeURIComponent(code)}/`))),
+    (code) => complaintThread(findComplaint(code)),
+  ),
+  // changes: { status?, priority? }
+  adminUpdateComplaint: live(
+    async (code, changes) =>
+      complaintThread(unwrap(await request(`/admin/complaints/${encodeURIComponent(code)}/`, { method: "PATCH", body: changes }))),
+    (code, changes) => complaintThread(Object.assign(findComplaint(code), changes)),
+  ),
+  adminReplyComplaint: live(
+    async (code, message) =>
+      followUpMessage(unwrap(await request(`/complaints/${encodeURIComponent(code)}/follow-ups/`, { method: "POST", body: { message } }))),
+    (code, message) => followUpMessage(sampleReply(code, message, "superadmin")),
+  ),
 
   agentOverview: sample(data.agentOverview),
   agentFarmers: sample(data.agentFarmers),
@@ -204,11 +264,19 @@ export const api = {
   agentDailyFeedback: sample(data.agentDailyFeedback),
   agentSmsMessages: sample(data.agentSmsMessages),
   agentNotifications: sample(data.agentNotifications),
-  agentComplaints: sample(data.agentComplaints),
+  // ---------- Complaints: extension agent ----------
   // Agent complaints page: the four cards and the "My complaints" table.
   agentComplaintStats: live(
-    async () => (await request("/agent/complaints/stats/")).data,
-    () => sampleComplaintStats(data.agentComplaintList),
+    async () => unwrap(await request("/agent/complaints/stats/")),
+    () => {
+      const rows = myComplaints();
+      return {
+        total_submitted: rows.length,
+        open: countBy(rows, "pending"),
+        in_progress: countBy(rows, "on_going"),
+        resolved: countBy(rows, "closed"),
+      };
+    },
   ),
   agentMyComplaints: live(
     async ({ search = "", status = "", limit } = {}) => {
@@ -217,10 +285,50 @@ export const api = {
       if (status) params.set("status", status);
       if (limit) params.set("limit", String(limit));
       const query = params.toString();
-      const { data: page } = await request(`/agent/complaints/my/${query ? `?${query}` : ""}`);
+      const page = unwrap(await request(`/agent/complaints/my/${query ? `?${query}` : ""}`));
       return { total: page.total, showing: page.showing, rows: page.results.map(complaintRow) };
     },
-    (options) => sampleMyComplaints(data.agentComplaintList, options),
+    sampleMyComplaints,
+  ),
+  // There is no agent endpoint for one complaint: GET /complaints/ returns all of the agent's
+  // complaints with their messages, so pick the one asked for.
+  agentComplaintDetail: live(
+    async (code) => {
+      const all = unwrap(await request("/complaints/"));
+      const found = (all || []).find((c) => String(c.code).toLowerCase() === String(code).toLowerCase());
+      if (!found) throw new ApiError(404, { detail: "Not found." });
+      return complaintThread(found);
+    },
+    (code) => {
+      const found = findComplaint(code);
+      if (found.agent_name !== SAMPLE_AGENT) throw new ApiError(404, { detail: "Not found." });
+      return complaintThread(found);
+    },
+  ),
+  // body: { subject, priority, message }. Returns the new complaint with its first message.
+  agentSubmitComplaint: live(
+    async (body) => complaintThread(unwrap(await request("/complaints/", { method: "POST", body }))),
+    (body) => {
+      sampleCounter += 1;
+      const code = `CMP-0${sampleCounter}`;
+      const created = {
+        id: code.toLowerCase(),
+        code,
+        agent_name: SAMPLE_AGENT,
+        subject: body.subject,
+        priority: body.priority || "medium",
+        status: "pending",
+        created_at: now(),
+        follow_ups: [{ id: `${code}-1`, sender_role: "agent", sender_name: SAMPLE_AGENT, created_at: now(), message: body.message }],
+      };
+      data.complaintStore.unshift(created);
+      return complaintThread(created);
+    },
+  ),
+  agentReplyComplaint: live(
+    async (code, message) =>
+      followUpMessage(unwrap(await request(`/complaints/${encodeURIComponent(code)}/follow-ups/`, { method: "POST", body: { message } }))),
+    (code, message) => followUpMessage(sampleReply(code, message, "agent")),
   ),
   agentProfile: sample(data.agentProfile),
 

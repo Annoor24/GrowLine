@@ -74,41 +74,31 @@ export const agentNotifications = [
   { id: "N-2", title: "Farm registration reminder", when: "Yesterday", from: "Super Admin", body: "Ensure each farm has its own unique ID and GPS coordinates." },
 ];
 
-export const agentComplaints = [
-  {
-    id: "CMP-103",
-    subject: "Cannot update farm GPS",
-    submitted: "13 Oct",
-    priority: "High",
-    status: "Open",
-    messages: [
-      { from: "You", when: "13 Oct", text: "The farm coordinates are not saving after I submit." },
-      { from: "Super Admin", when: "13 Oct", text: "We are reviewing this issue. Please retry shortly." },
-    ],
-  },
-  {
-    id: "CMP-098",
-    subject: "SMS delivery issue",
-    submitted: "9 Oct",
-    priority: "Medium",
-    status: "Resolved",
-    messages: [
-      { from: "You", when: "9 Oct", text: "Several farmers did not receive yesterday's advisory." },
-      { from: "Super Admin", when: "10 Oct", text: "The gateway issue has been fixed. Messages were resent." },
-    ],
-  },
-];
 
-// Same shape as GET /agent/complaints/my/ results (stored status values).
-export const agentComplaintList = [
-  { id: "c-208", ticket: "CMP-0208", subject: "GPS coordinates not saving", created_at: "2026-10-14T09:00:00Z", priority: "high", status: "pending" },
-  { id: "c-204", ticket: "CMP-0204", subject: "Farmer profile not updating", created_at: "2026-10-12T09:00:00Z", priority: "medium", status: "on_going" },
-  { id: "c-199", ticket: "CMP-0199", subject: "Duplicate farm record", created_at: "2026-10-09T09:00:00Z", priority: "high", status: "pending" },
-  { id: "c-187", ticket: "CMP-0187", subject: "SMS history not loading", created_at: "2026-10-02T09:00:00Z", priority: "low", status: "closed" },
-  { id: "c-176", ticket: "CMP-0176", subject: "Cannot add second farm", created_at: "2026-09-28T09:00:00Z", priority: "medium", status: "closed" },
-  { id: "c-170", ticket: "CMP-0170", subject: "Wrong LGA on farmer", created_at: "2026-09-25T09:00:00Z", priority: "low", status: "closed" },
-  { id: "c-162", ticket: "CMP-0162", subject: "Advisory not showing", created_at: "2026-09-20T09:00:00Z", priority: "medium", status: "closed" },
-  { id: "c-158", ticket: "CMP-0158", subject: "Login keeps expiring", created_at: "2026-09-18T09:00:00Z", priority: "low", status: "closed" },
+// Complaints in the backend's shape (stored status values, follow_ups oldest first).
+// Shared by the agent and admin sample pages; sample submits and replies are added to it while the app runs.
+const followUp = (id, role, name, at, message) => ({ id, sender_role: role, sender_name: name, created_at: at, message });
+const complaint = (code, subject, day, priority, status, agentName, message, adminReply) => ({
+  id: code.toLowerCase(),
+  code,
+  agent_name: agentName,
+  subject,
+  created_at: `2026-${day}T09:00:00Z`,
+  priority,
+  status,
+  follow_ups: [
+    followUp(`${code}-1`, "agent", agentName, `2026-${day}T09:00:00Z`, message),
+    ...(adminReply ? [followUp(`${code}-2`, "superadmin", "Super Admin", `2026-${day}T11:30:00Z`, adminReply)] : []),
+  ],
+});
+
+export const complaintStore = [
+  complaint("CMP-0208", "GPS coordinates not saving", "10-14", "high", "pending", "Amina Yusuf", "The farm coordinates are not saving after I submit."),
+  complaint("CMP-0204", "Farmer profile not updating", "10-12", "medium", "on_going", "Amina Yusuf", "I changed a farmer's LGA but the old one still shows.", "We are looking into this. Please retry tomorrow."),
+  complaint("CMP-0199", "Duplicate farm record", "10-09", "high", "pending", "Amina Yusuf", "FM-0201 appears twice under the same farmer."),
+  complaint("CMP-0187", "SMS history not loading", "10-02", "low", "closed", "Amina Yusuf", "The SMS history page keeps loading.", "Fixed in today's update."),
+  complaint("CMP-0176", "Cannot add second farm", "09-28", "medium", "closed", "Bello Musa", "Add farm fails for FMR-1022.", "Resolved. The farmer code was mistyped."),
+  complaint("CMP-0170", "Wrong LGA on farmer", "09-25", "low", "closed", "Kemi Ade", "Two farmers appear under the wrong LGA.", "Corrected."),
 ];
 
 export const agentProfile = {
@@ -259,44 +249,6 @@ export const adminReports = {
   ],
 };
 
-export const adminComplaints = [
-  {
-    id: "CMP-103",
-    agent: "Amina Yusuf",
-    subject: "Cannot update farm GPS",
-    priority: "High",
-    status: "Open",
-    submitted: "13 October 2026",
-    message: "The farm coordinates are not saving after I submit.",
-    assigned: "Super Admin",
-  },
-  {
-    id: "CMP-102",
-    agent: "Bello Musa",
-    subject: "SMS delivery issue",
-    priority: "Medium",
-    status: "In progress",
-    submitted: "12 October 2026",
-    message: "Several farmers did not receive the morning advisory.",
-    assigned: "Super Admin",
-  },
-  {
-    id: "CMP-101",
-    agent: "Kemi Ade",
-    subject: "Farmer assignment",
-    priority: "Low",
-    status: "Resolved",
-    submitted: "10 October 2026",
-    message: "Two farmers appear under the wrong agent.",
-    assigned: "Super Admin",
-  },
-];
-export const adminComplaintStats = [
-  { label: "Open complaints", value: "12" },
-  { label: "In progress", value: "5" },
-  { label: "Resolved", value: "48" },
-  { label: "High priority", value: "3" },
-];
 
 export const adminNotifications = [
   { id: "AN-1", title: "Updated spray guidance", recipients: "All agents", dashboard: "38 delivered", email: "38 queued", sent: "13 Oct" },

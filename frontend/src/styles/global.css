@@ -758,6 +758,11 @@ textarea.input {
   margin-bottom: 4px;
 }
 
+.message-admin .message-meta {
+  color: var(--green-700);
+  font-weight: 600;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1100px) {
   .grid-4 {

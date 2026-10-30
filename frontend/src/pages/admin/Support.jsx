@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/index.js";
+import { ApiError } from "../../api/client.js";
+import Conversation from "../../components/Conversation.jsx";
 import useAsync from "../../hooks/useAsync.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -11,33 +13,102 @@ import PageHeader from "../../components/PageHeader.jsx";
 import StatCard from "../../components/StatCard.jsx";
 import StatusPill from "../../components/StatusPill.jsx";
 
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Open" },
+  { value: "on_going", label: "In progress" },
+  { value: "closed", label: "Resolved" },
+];
+const PRIORITY_OPTIONS = [
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
+const withAll = (label, options) => [{ value: "", label }, ...options];
+
 export function AdminComplaints() {
   const navigate = useNavigate();
-  const { data, loading, error, reload } = useAsync(() => Promise.all([api.adminComplaints(), api.adminComplaintStats()]));
-  if (loading || !data) return <Loading error={error} onRetry={reload} />;
-  const [complaints, stats] = data;
+  const [searchInput, setSearchInput] = useState("");
+  const [filters, setFilters] = useState({ search: "", status: "", priority: "" });
+
+  // Wait until the admin stops typing before searching.
+  useEffect(() => {
+    const timer = setTimeout(() => setFilters((f) => ({ ...f, search: searchInput.trim() })), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const stats = useAsync(api.adminComplaintStats);
+  const list = useAsync(() => api.adminComplaints(filters), [filters.search, filters.status, filters.priority]);
+
   const columns = [
-    { key: "id", label: "Ticket" },
+    { key: "ticket", label: "Ticket" },
     { key: "agent", label: "Agent" },
     { key: "subject", label: "Subject" },
-    { key: "priority", label: "Priority", render: (row) => <StatusPill>{row.priority}</StatusPill> },
+    { key: "priority", label: "Priority" },
     { key: "status", label: "Status", render: (row) => <StatusPill>{row.status}</StatusPill> },
   ];
+  const cards = stats.data
+    ? [
+        { label: "Open complaints", value: stats.data.open_complaints },
+        { label: "In progress", value: stats.data.in_progress },
+        { label: "Resolved", value: stats.data.resolved },
+        { label: "High priority", value: stats.data.high_priority },
+      ]
+    : [];
+
   return (
     <div className="stack">
-      <PageHeader bar="Admin" title="Complaints & support" subtitle="Receive, assign, respond and resolve agent complaints" />
-      <div className="grid grid-4">
-        {stats.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
-        ))}
-      </div>
+      <PageHeader bar="Admin" title="Complaints & support" subtitle="Receive, respond to and resolve agent complaints" />
+      {stats.data ? (
+        <div className="grid grid-4">
+          {cards.map((stat) => (
+            <StatCard key={stat.label} {...stat} />
+          ))}
+        </div>
+      ) : (
+        <Loading error={stats.error} onRetry={stats.reload} />
+      )}
       <Card>
-        <DataTable
-          columns={columns}
-          rows={complaints}
-          onRowClick={(row) => navigate(`/admin/complaints/${row.id}`)}
-          empty="No complaints received."
-        />
+        <div className="stack">
+          <div className="row">
+            <div style={{ flex: 2, minWidth: 200 }}>
+              <FormField
+                aria-label="Search complaints"
+                type="search"
+                placeholder="Search ticket, subject or agent"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <FormField
+                aria-label="Filter by status"
+                kind="select"
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                options={withAll("All statuses", STATUS_OPTIONS)}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <FormField
+                aria-label="Filter by priority"
+                kind="select"
+                value={filters.priority}
+                onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+                options={withAll("All priorities", PRIORITY_OPTIONS)}
+              />
+            </div>
+          </div>
+          {list.data ? (
+            <DataTable
+              columns={columns}
+              rows={list.data}
+              onRowClick={(row) => navigate(`/admin/complaints/${row.ticket}`)}
+              empty={filters.search || filters.status || filters.priority ? "No complaints match your filters." : "No complaints received."}
+            />
+          ) : (
+            <Loading error={list.error} onRetry={list.reload} />
+          )}
+        </div>
       </Card>
     </div>
   );
@@ -45,65 +116,99 @@ export function AdminComplaints() {
 
 export function AdminComplaintDetail() {
   const { id } = useParams();
-  const { data, loading, error, reload } = useAsync(api.adminComplaints);
-  const [reply, setReply] = useState("");
-  const [replies, setReplies] = useState([]);
-  const [resolved, setResolved] = useState(false);
-  if (loading || !data) return <Loading error={error} onRetry={reload} />;
-  const complaint = data.find((item) => item.id === id);
-  if (!complaint) return <p className="notice notice-warning">Complaint not found.</p>;
+  const { data, loading, error, reload } = useAsync(() => api.adminComplaintDetail(id), [id]);
+  const [sent, setSent] = useState([]);
+  const [changes, setChanges] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
 
-  function send() {
-    if (!reply.trim()) return;
-    setReplies([...replies, reply]);
-    setReply("");
+  if (loading || !data) {
+    if (error instanceof ApiError && error.status === 404) {
+      return (
+        <div className="stack">
+          <p className="notice notice-warning">Complaint {id} was not found.</p>
+          <div>
+            <Button variant="secondary" as={Link} to="/admin/complaints">
+              ‹ Back to complaints
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    return <Loading error={error} onRetry={reload} />;
+  }
+
+  const current = changes || data;
+  const resolved = current.statusValue === "closed";
+
+  async function send(text) {
+    const message = await api.adminReplyComplaint(data.ticket, text);
+    setSent((list) => [...list, message]);
+  }
+
+  // PATCH status and/or priority; the response is the updated complaint.
+  async function update(fields, message) {
+    setSaving(true);
+    setNotice("");
+    try {
+      const updated = await api.adminUpdateComplaint(data.ticket, fields);
+      setChanges(updated);
+      setNotice(message);
+    } catch {
+      setNotice("The change could not be saved. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div className="stack">
-      <PageHeader bar="Admin" title={`Complaint ${complaint.id}`} subtitle="Two-way communication with extension agents" />
+      <PageHeader bar="Admin" title={`Complaint ${data.ticket}`} subtitle="Two-way communication with extension agents" />
+      <div>
+        <Button variant="secondary" as={Link} to="/admin/complaints">
+          ‹ Back to complaints
+        </Button>
+      </div>
+      {notice ? <p className="notice notice-success">{notice}</p> : null}
       <div className="grid grid-main-side">
-        <Card title={complaint.subject} subtitle={`Submitted by ${complaint.agent} • ${complaint.submitted}`}>
+        <Card title={data.subject} subtitle={`Submitted by ${data.agent} • ${data.created}`}>
           <div className="stack">
             <div>
-              <StatusPill>{resolved ? "Resolved" : complaint.status}</StatusPill>
+              <StatusPill>{current.status}</StatusPill>
             </div>
-            <div>
-              <div className="small muted">Agent message</div>
-              <p>{complaint.message}</p>
-            </div>
-            {replies.map((text, index) => (
-              <div className="message" key={`${text}-${index}`}>
-                <div className="message-meta">Super Admin • Just now</div>
-                <p>{text}</p>
-              </div>
-            ))}
-            <FormField
-              label="Admin reply"
-              kind="textarea"
+            <Conversation
+              messages={data.messages.concat(sent)}
+              onSend={send}
+              replyLabel="Admin reply"
               placeholder="Type a response to the agent…"
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
+              actions={
+                <Button variant="soft" disabled={resolved || saving} onClick={() => update({ status: "closed" }, "Complaint marked as resolved.")}>
+                  {resolved ? "Resolved" : "Mark resolved"}
+                </Button>
+              }
             />
-            <div className="form-actions">
-              <Button onClick={send}>Send reply</Button>
-              <Button variant="soft" onClick={() => setResolved(true)} disabled={resolved}>
-                Mark resolved
-              </Button>
-            </div>
           </div>
         </Card>
         <Card title="Ticket details">
-          <div className="kv">
-            <span>Priority: {complaint.priority}</span>
-            <span>Assigned: {complaint.assigned}</span>
+          <div className="stack">
+            <FormField
+              label="Status"
+              kind="select"
+              value={current.statusValue}
+              disabled={saving}
+              onChange={(e) => update({ status: e.target.value }, "Status updated.")}
+              options={STATUS_OPTIONS}
+            />
+            <FormField
+              label="Priority"
+              kind="select"
+              value={current.priorityValue}
+              disabled={saving}
+              onChange={(e) => update({ priority: e.target.value }, "Priority updated.")}
+              options={PRIORITY_OPTIONS}
+            />
           </div>
         </Card>
-      </div>
-      <div>
-        <Button variant="secondary" as={Link} to="/admin/complaints">
-          Back to complaints
-        </Button>
       </div>
     </div>
   );

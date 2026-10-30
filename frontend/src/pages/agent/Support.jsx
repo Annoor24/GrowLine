@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/index.js";
+import { ApiError } from "../../api/client.js";
+import Conversation from "../../components/Conversation.jsx";
 import useAsync from "../../hooks/useAsync.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -192,23 +194,50 @@ export function Complaints() {
   );
 }
 
+// Backend limits: subject 100 characters, first message 250.
+const SUBJECT_MAX = 100;
+const MESSAGE_MAX = 250;
+
 export function NewComplaint() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ subject: "", priority: "", description: "" });
   const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
   const set = (key) => (event) => {
     setForm({ ...form, [key]: event.target.value });
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
     const next = {};
     if (!form.subject.trim()) next.subject = "Enter a short subject.";
     if (!form.priority) next.priority = "Choose a priority.";
     if (form.description.trim().length < 10) next.description = "Describe the issue in at least 10 characters.";
     setErrors(next);
-    if (Object.keys(next).length === 0) navigate("/agent/complaints");
+    if (Object.keys(next).length > 0) return;
+
+    setSubmitting(true);
+    try {
+      const created = await api.agentSubmitComplaint({
+        subject: form.subject.trim(),
+        priority: form.priority,
+        message: form.description.trim(),
+      });
+      navigate(`/agent/complaints/${created.ticket}`);
+    } catch (err) {
+      const data = err instanceof ApiError ? err.data : null;
+      const first = (value) => (Array.isArray(value) ? value[0] : value);
+      const fieldErrors = {
+        subject: first(data?.subject),
+        priority: first(data?.priority),
+        description: first(data?.message),
+      };
+      const known = Object.values(fieldErrors).some(Boolean);
+      setErrors(known ? fieldErrors : { form: "Your complaint could not be sent. Please try again." });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -222,6 +251,7 @@ export function NewComplaint() {
             value={form.subject}
             onChange={set("subject")}
             error={errors.subject}
+            maxLength={SUBJECT_MAX}
           />
           <FormField
             label="Priority"
@@ -231,9 +261,9 @@ export function NewComplaint() {
             error={errors.priority}
             options={[
               { value: "", label: "Select priority" },
-              { value: "Low", label: "Low" },
-              { value: "Medium", label: "Medium" },
-              { value: "High", label: "High" },
+              { value: "low", label: "Low" },
+              { value: "medium", label: "Medium" },
+              { value: "high", label: "High" },
             ]}
           />
           <FormField
@@ -243,10 +273,17 @@ export function NewComplaint() {
             value={form.description}
             onChange={set("description")}
             error={errors.description}
-            hint="Include the affected farmer or farm ID, what happened and when. Never include passwords."
+            maxLength={MESSAGE_MAX}
+            hint={`Include the affected farmer or farm ID, what happened and when. Never include passwords. ${form.description.length}/${MESSAGE_MAX} characters.`}
           />
+          {errors.form ? <p className="notice notice-danger">{errors.form}</p> : null}
           <div className="form-actions">
-            <Button type="submit">Submit complaint</Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Submitting…" : "Submit complaint"}
+            </Button>
+            <Button variant="secondary" as={Link} to="/agent/complaints">
+              Cancel
+            </Button>
           </div>
         </form>
       </Card>
@@ -256,53 +293,51 @@ export function NewComplaint() {
 
 export function ComplaintThread() {
   const { id } = useParams();
-  const { data, loading, error, reload } = useAsync(api.agentComplaints);
-  const [reply, setReply] = useState("");
+  const { data, loading, error, reload } = useAsync(() => api.agentComplaintDetail(id), [id]);
   const [sent, setSent] = useState([]);
-  if (loading || !data) return <Loading error={error} onRetry={reload} />;
-  // The conversation endpoint is not connected yet, so only the sample tickets open here.
-  const complaint = data.find((item) => item.id === id);
-  if (!complaint) {
-    return (
-      <div className="stack">
-        <p className="notice notice-warning">
-          Opening ticket {id} is not available yet: the conversation view is still waiting for its backend endpoint.
-        </p>
-        <div>
-          <Button variant="secondary" as={Link} to="/agent/complaints">
-            ‹ Back to complaints
-          </Button>
+
+  if (loading || !data) {
+    if (error instanceof ApiError && error.status === 404) {
+      return (
+        <div className="stack">
+          <p className="notice notice-warning">Complaint {id} was not found.</p>
+          <div>
+            <Button variant="secondary" as={Link} to="/agent/complaints">
+              ‹ Back to complaints
+            </Button>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+    return <Loading error={error} onRetry={reload} />;
   }
 
-  function send() {
-    if (!reply.trim()) return;
-    setSent([...sent, { from: "You", when: "Just now", text: reply }]);
-    setReply("");
+  const resolved = data.statusValue === "closed";
+
+  async function send(text) {
+    const message = await api.agentReplyComplaint(data.ticket, text);
+    setSent((list) => [...list, message]);
   }
 
   return (
     <div className="stack">
       <PageHeader bar="Agent" title="Complaint conversation" subtitle="View admin replies and complaint status" />
-      <Card
-        title={`${complaint.id} • ${complaint.subject}`}
-        subtitle={`Status: ${complaint.status} • Priority: ${complaint.priority}`}
-      >
-        {complaint.messages.concat(sent).map((message, index) => (
-          <div className="message" key={`${message.from}-${index}`}>
-            <div className="message-meta">
-              {message.from} • {message.when}
-            </div>
-            <p>{message.text}</p>
+      <div>
+        <Button variant="secondary" as={Link} to="/agent/complaints">
+          ‹ Back to complaints
+        </Button>
+      </div>
+      <Card title={`${data.ticket} • ${data.subject}`} subtitle={`Created ${data.created} • Priority: ${data.priority}`}>
+        <div className="stack">
+          <div>
+            <StatusPill>{data.status}</StatusPill>
           </div>
-        ))}
-        <div className="stack" style={{ marginTop: 16 }}>
-          <FormField label="Your reply" kind="textarea" value={reply} onChange={(e) => setReply(e.target.value)} />
-          <div className="form-actions">
-            <Button onClick={send}>Send reply</Button>
-          </div>
+          <Conversation
+            messages={data.messages.concat(sent)}
+            onSend={send}
+            placeholder="Add more details or ask for an update…"
+            closedNote={resolved ? "This complaint is resolved. Submit a new complaint if you still need help." : ""}
+          />
         </div>
       </Card>
     </div>
