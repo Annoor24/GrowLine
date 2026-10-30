@@ -2,6 +2,10 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import RequireRole from "./auth/RequireRole.jsx";
 import AppLayout from "./layouts/AppLayout.jsx";
 
+import Landing from "./pages/public/Landing.jsx";
+import RegisterFarm from "./pages/public/RegisterFarm.jsx";
+import ApplyAgent from "./pages/public/ApplyAgent.jsx";
+
 import { ActivationSuccess, AgentActivate, AgentSignIn, InvitationExpired } from "./pages/auth/AgentAuth.jsx";
 import { AdminSignIn, ForgotPassword, ResetLinkSent, SessionExpired, SetNewPassword } from "./pages/auth/AdminAuth.jsx";
 
@@ -54,7 +58,10 @@ const adminAccountNav = [{ to: "/admin/profile", label: "My Profile", icon: "pro
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/agent" replace />} />
+      {/* Public site */}
+      <Route path="/" element={<Landing />} />
+      <Route path="/register" element={<RegisterFarm />} />
+      <Route path="/apply" element={<ApplyAgent />} />
 
       {/* Extension agent: public screens */}
       <Route path="/login" element={<AgentSignIn />} />

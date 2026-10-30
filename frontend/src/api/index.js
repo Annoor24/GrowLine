@@ -186,4 +186,8 @@ export const api = {
   agentNotifications: sample(data.agentNotifications),
   agentComplaints: sample(data.agentComplaints),
   agentProfile: sample(data.agentProfile),
+
+  // ---------- Public forms (no backend endpoint yet): accept and do nothing ----------
+  registerFarmer: (payload) => delay({ ok: true, payload }),
+  applyAgent: (payload) => delay({ ok: true, payload }),
 };
