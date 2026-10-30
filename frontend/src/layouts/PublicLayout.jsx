@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import "../styles/public.css";
@@ -11,6 +11,59 @@ const LINKS = [
   { href: "/#agents", label: "Extension agents" },
   { href: "/#faqs", label: "FAQs" },
 ];
+
+const SIGN_IN_OPTIONS = [
+  { to: "/login", label: "Extension agent" },
+  { to: "/admin/login", label: "Super admin" },
+];
+
+// Desktop: a "Sign in" button that opens a small menu. Phone: the options are listed in the menu.
+function SignInMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onClick = (event) => {
+      if (!ref.current?.contains(event.target)) setOpen(false);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="signin" ref={ref}>
+      <button
+        type="button"
+        className="signin-toggle"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((value) => !value);
+        }}
+      >
+        Sign in <span aria-hidden="true">▾</span>
+      </button>
+      <div className={`signin-options${open ? " open" : ""}`}>
+        <span className="signin-heading">Sign in</span>
+        {SIGN_IN_OPTIONS.map((option) => (
+          <Link key={option.to} to={option.to} onClick={() => setOpen(false)}>
+            {option.label}
+            <span className="signin-suffix"> sign in</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function PublicLayout({ children }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -30,9 +83,7 @@ export default function PublicLayout({ children }) {
                 {link.label}
               </a>
             ))}
-            <Link to="/login" className="public-signin">
-              Sign in
-            </Link>
+            <SignInMenu />
           </nav>
           <Button as={Link} to="/register" className="public-cta" onClick={close}>
             Register my farm

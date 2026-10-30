@@ -106,9 +106,53 @@
   text-decoration: underline;
 }
 
-.public-signin {
+.signin {
+  position: relative;
+}
+
+.signin-toggle {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
   font-weight: 600;
   color: var(--green-700);
+}
+
+.signin-options {
+  display: none;
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  min-width: 190px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(23, 77, 56, 0.12);
+  padding: 6px;
+  flex-direction: column;
+}
+
+.signin-options.open {
+  display: flex;
+}
+
+.signin-options a {
+  padding: 9px 12px;
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.signin-options a:hover,
+.signin-options a:focus-visible {
+  background: var(--green-100);
+  color: var(--green-700);
+  text-decoration: none;
+}
+
+.signin-heading,
+.signin-suffix {
+  display: none;
 }
 
 .public-menu-button {
@@ -541,6 +585,41 @@
   .public-nav a {
     padding: 12px 0;
     border-bottom: 1px solid var(--border);
+  }
+
+  /* On phones both sign-in options are listed in the menu. */
+  .signin-toggle {
+    display: none;
+  }
+
+  .signin-options {
+    display: flex;
+    position: static;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    min-width: 0;
+  }
+
+  .signin-options a {
+    border-radius: 0;
+    padding: 12px 0;
+    color: var(--green-700);
+    font-weight: 600;
+  }
+
+  .signin-heading {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 16px;
+  }
+
+  .signin-suffix {
+    display: inline;
   }
 
   .hero {
