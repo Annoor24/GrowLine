@@ -32,6 +32,44 @@ export const apiLabel = (raw) => (raw ? API_LABELS[raw] || titleCase(raw) : "—
 export const smsLabel = (raw) => (raw ? SMS_LABELS[raw] || titleCase(raw) : "—");
 export const directiveLabel = (raw) => (raw ? DIRECTIVE_LABELS[raw] || titleCase(raw) : "—");
 
+// Agent: GET /agent/farmer-list/ rows. The code (FMR-…) is used in links and in add/farms/.
+export const agentFarmerRow = (f) => ({
+  id: f.code,
+  code: f.code,
+  name: f.name,
+  phone: f.phone_masked || "—",
+  farms: f.farms_count ?? 0,
+  location: [f.town_or_village, f.lga, f.state].filter(Boolean).join(", ") || "—",
+  status: titleCase(f.onboarding_status),
+});
+
+// Agent: GET /agent/farm-list/ rows. The list returns the centre of the farm's polygon.
+export const agentFarmRow = (f) => ({
+  id: f.code,
+  code: f.code,
+  name: f.name,
+  farmer: f.farmer_name || "—",
+  gps:
+    typeof f.centroid_latitude === "number" && typeof f.centroid_longitude === "number"
+      ? `${f.centroid_latitude.toFixed(4)}, ${f.centroid_longitude.toFixed(4)}`
+      : "—",
+  stage: titleCase(f.crop_stage),
+});
+
+// Agent: GET /agent/farmer/<code>/ (full phone number, the farmer's farms and their agent).
+export const agentFarmerDetail = (f) => ({
+  code: f.code,
+  name: f.name,
+  phone: f.phone || "—",
+  agentCode: f.agent_code || "—",
+  farms: (f.farms || []).map((farm) => ({
+    code: farm.code,
+    name: farm.name,
+    area: typeof farm.area_hectares === "number" ? `${farm.area_hectares} ha` : "—",
+    gpsStatus: titleCase(farm.gps_status),
+  })),
+});
+
 // Agent complaints: the API returns stored values, the page shows friendlier labels.
 export const COMPLAINT_STATUS_LABELS = { pending: "Open", on_going: "In progress", closed: "Resolved" };
 

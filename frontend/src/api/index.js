@@ -2,6 +2,9 @@ import * as data from "../mocks/data.js";
 import { ApiError, fetchAllPages, request, USE_MOCKS } from "./client.js";
 import {
   agentDetail,
+  agentFarmerDetail,
+  agentFarmerRow,
+  agentFarmRow,
   agentRow,
   complaintRow,
   complaintThread,
@@ -258,8 +261,31 @@ export const api = {
   ),
 
   agentOverview: sample(data.agentOverview),
-  agentFarmers: sample(data.agentFarmers),
-  agentFarms: sample(data.agentFarms),
+  // ---------- Agent farmers and farms ----------
+  agentFarmers: live(
+    async () => unwrap(await request("/agent/farmer-list/")).map(agentFarmerRow),
+    () => data.agentFarmers.map((f) => ({ ...f, code: f.id, location: "—", status: "Onboarded" })),
+  ),
+  agentFarms: live(
+    async () => unwrap(await request("/agent/farm-list/")).map(agentFarmRow),
+    () => data.agentFarms.map((f) => ({ ...f, code: f.id, stage: "Vegetative" })),
+  ),
+  agentFarmerDetail: live(
+    async (code) => agentFarmerDetail(unwrap(await request(`/agent/farmer/${encodeURIComponent(code)}/`))),
+    (code) => {
+      const farmer = data.agentFarmers.find((f) => f.id.toLowerCase() === String(code).toLowerCase());
+      if (!farmer) throw new ApiError(404, { detail: "Not found." });
+      return {
+        code: farmer.id,
+        name: farmer.name,
+        phone: farmer.phone,
+        agentCode: "AGT-0042",
+        farms: data.agentFarms
+          .filter((farm) => farm.farmerId === farmer.id)
+          .map((farm) => ({ code: farm.id, name: farm.name, area: "1.2 ha", gpsStatus: "Pending" })),
+      };
+    },
+  ),
   agentAdvisories: sample(data.agentAdvisories),
   agentDailyFeedback: sample(data.agentDailyFeedback),
   agentSmsMessages: sample(data.agentSmsMessages),

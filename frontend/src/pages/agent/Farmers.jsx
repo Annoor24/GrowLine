@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/index.js";
+import { ApiError } from "../../api/client.js";
 import useAsync from "../../hooks/useAsync.js";
 import useGps from "../../hooks/useGps.js";
 import { isNigerianPhone } from "../../utils/validate.js";
@@ -20,7 +21,7 @@ export function MyFarmers() {
   const { data, loading, error, reload } = useAsync(api.agentFarmers);
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
-    { key: "id", label: "Farmer ID" },
+    { key: "code", label: "Farmer ID" },
     { key: "name", label: "Farmer" },
     { key: "phone", label: "Phone" },
     { key: "farms", label: "Farms" },
@@ -28,8 +29,8 @@ export function MyFarmers() {
       key: "action",
       label: "Action",
       render: (row) => (
-        <Link className="link-button" to={`/agent/farmers/${row.id}/farms/new`}>
-          Add farm
+        <Link className="link-button" to={`/agent/farmers/${row.code}/farms/new`}>
+          View
         </Link>
       ),
     },
@@ -198,11 +199,11 @@ export function MyFarms() {
   const { data, loading, error, reload } = useAsync(api.agentFarms);
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
-    { key: "id", label: "Farm ID" },
+    { key: "code", label: "Farm ID" },
     { key: "name", label: "Farm" },
     { key: "farmer", label: "Farmer" },
     { key: "gps", label: "GPS coordinates" },
-    { key: "crop", label: "Crop" },
+    { key: "stage", label: "Crop stage" },
   ];
   return (
     <div className="stack">
@@ -230,7 +231,8 @@ export function AddFarm() {
   const navigate = useNavigate();
   const { gps, capture } = useGps();
   const { data } = useAsync(api.agentFarmers);
-  const [farmerId, setFarmerId] = useState("");
+  const [searchParams] = useSearchParams();
+  const [farmerId, setFarmerId] = useState(searchParams.get("farmer") || "");
   const [errors, setErrors] = useState({});
 
   function save() {
@@ -242,7 +244,7 @@ export function AddFarm() {
   }
 
   const options = [{ value: "", label: "Select existing farmer's name" }].concat(
-    (data || []).map((farmer) => ({ value: farmer.id, label: `${farmer.name} (${farmer.id})` })),
+    (data || []).map((farmer) => ({ value: farmer.code, label: `${farmer.name} (${farmer.code})` })),
   );
 
   return (
@@ -276,16 +278,28 @@ export function AddFarm() {
   );
 }
 
-// MOCK content from the design ("Add another farm" for FRM-0104).
+// "Add another farm": the farmer (GET /agent/farmer/<code>/) and the farms they already have.
 export function AddAnotherFarm() {
   const navigate = useNavigate();
+  const { farmerId } = useParams();
+  const { data: farmer, loading, error, reload } = useAsync(() => api.agentFarmerDetail(farmerId), [farmerId]);
+  if (loading || !farmer) {
+    if (error instanceof ApiError && error.status === 404) {
+      return <p className="notice notice-warning">Farmer {farmerId} was not found among your farmers.</p>;
+    }
+    return <Loading error={error} onRetry={reload} />;
+  }
   return (
     <div className="stack">
       <PageHeader bar="Agent" title="Add another farm" subtitle="One tomato farmer can have multiple independent farms" />
-      <Card title="Farmer FRM-0104 · Amina Bello">
+      <Card title={`Farmer ${farmer.code} · ${farmer.name}`} subtitle={`Phone: ${farmer.phone} • Agent: ${farmer.agentCode}`}>
         <div className="kv">
-          <span>Farm FARM-0201 · 1.2 ha · <StatusPill>Verified</StatusPill></span>
-          <span>New farm FARM-0202 · 0.7 ha · <StatusPill>Pending</StatusPill></span>
+          {farmer.farms.length === 0 ? <span className="muted">No farms recorded yet.</span> : null}
+          {farmer.farms.map((farm) => (
+            <span key={farm.code}>
+              {farm.name} ({farm.code}) · {farm.area} · <StatusPill>{farm.gpsStatus}</StatusPill>
+            </span>
+          ))}
         </div>
       </Card>
       <Card title="Validation">
@@ -296,7 +310,7 @@ export function AddAnotherFarm() {
         </ul>
       </Card>
       <div className="form-actions">
-        <Button onClick={() => navigate("/agent/farms/new")}>+ Add As New Farm</Button>
+        <Button onClick={() => navigate(`/agent/farms/new?farmer=${farmer.code}`)}>+ Add As New Farm</Button>
         <Button variant="secondary" onClick={() => navigate("/agent/farms")}>
           Back to Farm List
         </Button>
