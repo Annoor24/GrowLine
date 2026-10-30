@@ -99,6 +99,18 @@ export const agentComplaints = [
   },
 ];
 
+// Same shape as GET /agent/complaints/my/ results (stored status values).
+export const agentComplaintList = [
+  { id: "c-208", ticket: "CMP-0208", subject: "GPS coordinates not saving", created_at: "2026-10-14T09:00:00Z", priority: "high", status: "pending" },
+  { id: "c-204", ticket: "CMP-0204", subject: "Farmer profile not updating", created_at: "2026-10-12T09:00:00Z", priority: "medium", status: "on_going" },
+  { id: "c-199", ticket: "CMP-0199", subject: "Duplicate farm record", created_at: "2026-10-09T09:00:00Z", priority: "high", status: "pending" },
+  { id: "c-187", ticket: "CMP-0187", subject: "SMS history not loading", created_at: "2026-10-02T09:00:00Z", priority: "low", status: "closed" },
+  { id: "c-176", ticket: "CMP-0176", subject: "Cannot add second farm", created_at: "2026-09-28T09:00:00Z", priority: "medium", status: "closed" },
+  { id: "c-170", ticket: "CMP-0170", subject: "Wrong LGA on farmer", created_at: "2026-09-25T09:00:00Z", priority: "low", status: "closed" },
+  { id: "c-162", ticket: "CMP-0162", subject: "Advisory not showing", created_at: "2026-09-20T09:00:00Z", priority: "medium", status: "closed" },
+  { id: "c-158", ticket: "CMP-0158", subject: "Login keeps expiring", created_at: "2026-09-18T09:00:00Z", priority: "low", status: "closed" },
+];
+
 export const agentProfile = {
   name: "Amina Yusuf",
   email: "amina@example.com",

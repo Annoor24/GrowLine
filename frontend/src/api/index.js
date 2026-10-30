@@ -3,6 +3,7 @@ import { fetchAllPages, request, USE_MOCKS } from "./client.js";
 import {
   agentDetail,
   agentRow,
+  complaintRow,
   farmDetail,
   farmRow,
   farmSummaryTiles,
@@ -111,6 +112,25 @@ const sampleFarmDetail = (id) => {
   };
 };
 
+const sampleComplaintStats = (rows) => ({
+  total_submitted: rows.length,
+  open: rows.filter((c) => c.status === "pending").length,
+  in_progress: rows.filter((c) => c.status === "on_going").length,
+  resolved: rows.filter((c) => c.status === "closed").length,
+});
+
+// Mirrors the backend: search on ticket or subject, filter by status, newest first, then limit.
+const sampleMyComplaints = (rows, { search = "", status = "", limit } = {}) => {
+  const term = search.toLowerCase();
+  const matching = rows.filter(
+    (c) =>
+      (!status || c.status === status) &&
+      (!term || c.ticket.toLowerCase().includes(term) || c.subject.toLowerCase().includes(term)),
+  );
+  const shown = limit ? matching.slice(0, limit) : matching;
+  return { total: matching.length, showing: shown.length, rows: shown.map(complaintRow) };
+};
+
 const sampleFarmerTiles = [
   { label: "Farmers", value: "1,200", note: "Unique farmer profiles" },
   { label: "Farms", value: "1,680", note: "Separate farm records" },
@@ -185,6 +205,23 @@ export const api = {
   agentSmsMessages: sample(data.agentSmsMessages),
   agentNotifications: sample(data.agentNotifications),
   agentComplaints: sample(data.agentComplaints),
+  // Agent complaints page: the four cards and the "My complaints" table.
+  agentComplaintStats: live(
+    async () => (await request("/agent/complaints/stats/")).data,
+    () => sampleComplaintStats(data.agentComplaintList),
+  ),
+  agentMyComplaints: live(
+    async ({ search = "", status = "", limit } = {}) => {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (status) params.set("status", status);
+      if (limit) params.set("limit", String(limit));
+      const query = params.toString();
+      const { data: page } = await request(`/agent/complaints/my/${query ? `?${query}` : ""}`);
+      return { total: page.total, showing: page.showing, rows: page.results.map(complaintRow) };
+    },
+    (options) => sampleMyComplaints(data.agentComplaintList, options),
+  ),
   agentProfile: sample(data.agentProfile),
 
   // ---------- Public farmer registration (no login) ----------

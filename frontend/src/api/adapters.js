@@ -32,6 +32,18 @@ export const apiLabel = (raw) => (raw ? API_LABELS[raw] || titleCase(raw) : "—
 export const smsLabel = (raw) => (raw ? SMS_LABELS[raw] || titleCase(raw) : "—");
 export const directiveLabel = (raw) => (raw ? DIRECTIVE_LABELS[raw] || titleCase(raw) : "—");
 
+// Agent complaints: the API returns stored values, the page shows friendlier labels.
+export const COMPLAINT_STATUS_LABELS = { pending: "Open", on_going: "In progress", closed: "Resolved" };
+
+export const complaintRow = (c) => ({
+  id: c.id,
+  ticket: c.ticket,
+  subject: c.subject,
+  created: formatDate(c.created_at),
+  priority: c.priority_display || titleCase(c.priority),
+  status: COMPLAINT_STATUS_LABELS[c.status] || c.status_display || titleCase(c.status),
+});
+
 export function formatWhen(iso) {
   if (!iso) return "—";
   const date = new Date(iso);

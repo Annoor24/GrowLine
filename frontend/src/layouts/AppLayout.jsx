@@ -11,6 +11,7 @@ const CONNECTED_PAGES = [
   /^\/admin\/agents\/\d+$/,
   /^\/admin\/farmers(\/[^/]+)?$/,
   /^\/admin\/farms(\/[^/]+)?$/,
+  /^\/agent\/complaints$/,
 ];
 
 // nav / accountNav: [{ to, label, icon?, end?, children?: [{ to, label }] }]
