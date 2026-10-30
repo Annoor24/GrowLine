@@ -10,6 +10,14 @@ export function isNigerianPhone(value) {
   return /^(\+234|234|0)[789][01]\d{8}$/.test(digits);
 }
 
+// 0803 123 4567 -> +2348031234567 (the agent endpoints expect E.164).
+export function toE164(value) {
+  const digits = String(value).replace(/[\s()-]/g, "").replace(/^\+/, "");
+  if (digits.startsWith("234")) return `+${digits}`;
+  if (digits.startsWith("0")) return `+234${digits.slice(1)}`;
+  return `+${digits}`;
+}
+
 // The design asks for 12+ characters mixing letters, numbers and symbols.
 // Returns the list of rules the password still breaks (empty list = fine).
 export function passwordProblems(password, min = 12) {

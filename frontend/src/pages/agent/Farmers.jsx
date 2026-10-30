@@ -4,7 +4,9 @@ import { api } from "../../api/index.js";
 import { ApiError } from "../../api/client.js";
 import useAsync from "../../hooks/useAsync.js";
 import useGps from "../../hooks/useGps.js";
-import { isNigerianPhone } from "../../utils/validate.js";
+import { isNigerianPhone, toE164 } from "../../utils/validate.js";
+import { farmPolygon, SIZE_UNITS } from "../../utils/farmShape.js";
+import { STATES, choose } from "../public/options.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
 import DataTable from "../../components/DataTable.jsx";
@@ -14,8 +16,8 @@ import Loading from "../../components/Loading.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import StatusPill from "../../components/StatusPill.jsx";
 
-// MOCK: registering this phone number simulates the "existing farmer found" case.
-const EXISTING_PHONE = "08035550142";
+// The backend rejects GPS readings less accurate than this.
+const MAX_GPS_METRES = 500;
 
 export function MyFarmers() {
   const { data, loading, error, reload } = useAsync(api.agentFarmers);
@@ -57,11 +59,65 @@ export function MyFarmers() {
   );
 }
 
+// Farm size, unit and GPS checks shared by Register farmer and Add farm.
+// The farm's outline is estimated from the GPS point and size (see utils/farmShape.js).
+function farmProblems(farm, gps) {
+  const problems = {};
+  if (!(Number(farm.size) > 0)) problems.size = "Enter the estimated farm size.";
+  if (!farm.unit) problems.unit = "Choose a unit.";
+  if (gps.status !== "ok") problems.gps = "Capture the farm GPS location first.";
+  else if (gps.accuracy > MAX_GPS_METRES) problems.gps = "The GPS signal is too weak. Move to an open area and capture again.";
+  return problems;
+}
+
+const footprintFor = (farm, gps) => farmPolygon(gps.latitude, gps.longitude, farm.size, farm.unit);
+
+function FarmSizeFields({ farm, onChange, errors }) {
+  return (
+    <div className="form-grid">
+      <FormField
+        label="Estimated farm size"
+        type="number"
+        min="0"
+        step="0.1"
+        inputMode="decimal"
+        placeholder="Enter number"
+        value={farm.size}
+        onChange={(e) => onChange({ ...farm, size: e.target.value })}
+        error={errors.size}
+        hint="1 plot is about 50 ft × 100 ft."
+      />
+      <FormField
+        label="Unit"
+        kind="select"
+        value={farm.unit}
+        onChange={(e) => onChange({ ...farm, unit: e.target.value })}
+        error={errors.unit}
+        options={[{ value: "", label: "Plots / Acres / Hectares" }, ...SIZE_UNITS]}
+      />
+    </div>
+  );
+}
+
+// "field: ['message']" errors from the backend -> first message per form field.
+function firstErrors(err, map) {
+  const data = err instanceof ApiError ? err.data : null;
+  const out = {};
+  if (!data || typeof data !== "object") return out;
+  Object.entries(map).forEach(([apiKey, formKey]) => {
+    const value = data[apiKey];
+    if (value && !out[formKey]) out[formKey] = Array.isArray(value) ? String(value[0]) : String(value);
+  });
+  return out;
+}
+
 export function RegisterFarmer() {
   const navigate = useNavigate();
   const { gps, capture } = useGps();
-  const [form, setForm] = useState({ name: "", phone: "", state: "", lga: "" });
+  const [form, setForm] = useState({ name: "", phone: "", state: "", lga: "", town: "", language: "en" });
+  const [farm, setFarm] = useState({ size: "", unit: "" });
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const set = (key) => (event) => {
     setForm({ ...form, [key]: event.target.value });
@@ -77,20 +133,44 @@ export function RegisterFarmer() {
       next.phone = "Use a Nigerian mobile number, e.g. 0803 123 4567 or +234 803 123 4567.";
     }
     if (!form.state) next.state = "Choose a state.";
-    if (addFarm && gps.status !== "ok") next.gps = "Capture the farm GPS location first.";
+    if (addFarm) Object.assign(next, farmProblems(farm, gps));
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  function save(addFarm) {
+  async function save(addFarm) {
     if (!validate(addFarm)) return;
-    const digits = form.phone.replace(/\D/g, "");
-    if (digits.endsWith(EXISTING_PHONE.slice(1))) {
-      navigate("/agent/farmers/existing");
-      return;
+    setSaving(true);
+    try {
+      await api.agentRegisterFarmer({
+        full_name: form.name.trim(),
+        phone_e164: toE164(form.phone),
+        state: form.state,
+        lga: form.lga.trim() || undefined,
+        town_or_village: form.town.trim() || undefined,
+        language: form.language,
+        farms: addFarm ? [{ estimated_footprint: footprintFor(farm, gps) }] : [],
+      });
+      navigate(addFarm ? "/agent/farms" : "/agent/farmers");
+    } catch (err) {
+      const found = firstErrors(err, {
+        full_name: "name",
+        phone_e164: "phone",
+        state: "state",
+        lga: "lga",
+        town_or_village: "town",
+        language: "language",
+      });
+      const farmError = err instanceof ApiError && Array.isArray(err.data?.farms) ? err.data.farms[0]?.estimated_footprint : null;
+      if (farmError) found.gps = Array.isArray(farmError) ? farmError[0] : String(farmError);
+      if (Object.keys(found).length === 0) found.form = "The farmer could not be saved. Check your connection and try again.";
+      setErrors(found);
+    } finally {
+      setSaving(false);
     }
-    navigate(addFarm ? "/agent/farms/new" : "/agent/farmers");
   }
+
+  const duplicatePhone = /already exists/i.test(errors.phone || "");
 
   return (
     <div className="stack">
@@ -120,31 +200,45 @@ export function RegisterFarmer() {
               value={form.state}
               onChange={set("state")}
               error={errors.state}
-              options={[
-                { value: "", label: "Select state" },
-                { value: "kano", label: "Kano" },
-                { value: "kaduna", label: "Kaduna" },
-                { value: "oyo", label: "Oyo" },
-              ]}
+              options={choose("Select state", STATES)}
             />
+            <FormField label="LGA" placeholder="Enter LGA" value={form.lga} onChange={set("lga")} error={errors.lga} />
+            <FormField label="Town or village (optional)" placeholder="Enter town or village" value={form.town} onChange={set("town")} error={errors.town} />
             <FormField
-              label="LGA"
+              label="SMS language"
               kind="select"
-              value={form.lga}
-              onChange={set("lga")}
-              options={[{ value: "", label: "Select LGA" }]}
+              value={form.language}
+              onChange={set("language")}
+              error={errors.language}
+              options={[
+                { value: "en", label: "English" },
+                { value: "yo", label: "Yoruba" },
+              ]}
             />
             <FormField label="Assigned extension agent" value="Current agent (auto assigned)" readOnly />
           </div>
+          {duplicatePhone ? (
+            <p className="notice notice-warning">
+              This phone number is already registered. If the farmer is yours, find them in{" "}
+              <Link className="link-button" to="/agent/farmers">
+                My Farmers
+              </Link>{" "}
+              and use View to add a farm. Do not create a duplicate farmer.
+            </p>
+          ) : null}
           <GpsCapture
             gps={gps}
             onCapture={capture}
             error={errors.gps}
             intro="Capture coordinates for the first farm. Additional farms can be added after saving."
           />
+          <FarmSizeFields farm={farm} onChange={(next) => { setFarm(next); setErrors({ ...errors, size: "", unit: "" }); }} errors={errors} />
+          {errors.form ? <p className="notice notice-danger">{errors.form}</p> : null}
           <div className="form-actions">
-            <Button onClick={() => save(true)}>Save and add farm</Button>
-            <Button variant="soft" onClick={() => save(false)}>
+            <Button onClick={() => save(true)} disabled={saving}>
+              {saving ? "Saving…" : "Save and add farm"}
+            </Button>
+            <Button variant="soft" onClick={() => save(false)} disabled={saving}>
               Save farmer only
             </Button>
           </div>
@@ -233,14 +327,27 @@ export function AddFarm() {
   const { data } = useAsync(api.agentFarmers);
   const [searchParams] = useSearchParams();
   const [farmerId, setFarmerId] = useState(searchParams.get("farmer") || "");
+  const [farm, setFarm] = useState({ size: "", unit: "" });
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
-  function save() {
-    const next = {};
+  async function save() {
+    const next = farmProblems(farm, gps);
     if (!farmerId) next.farmer = "Choose the farmer this farm belongs to.";
-    if (gps.status !== "ok") next.gps = "Capture the farm GPS location before saving.";
     setErrors(next);
-    if (Object.keys(next).length === 0) navigate("/agent/farms");
+    if (Object.keys(next).length > 0) return;
+
+    setSaving(true);
+    try {
+      await api.agentAddFarm({ farmer_code: farmerId, estimated_footprint: footprintFor(farm, gps) });
+      navigate("/agent/farms");
+    } catch (err) {
+      const found = firstErrors(err, { farmer_code: "farmer", estimated_footprint: "gps" });
+      if (Object.keys(found).length === 0) found.form = "The farm could not be saved. Check your connection and try again.";
+      setErrors(found);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const options = [{ value: "", label: "Select existing farmer's name" }].concat(
@@ -269,8 +376,12 @@ export function AddFarm() {
             error={errors.gps}
             intro="Capture coordinates for the farm. You can add as many farms as needed."
           />
+          <FarmSizeFields farm={farm} onChange={(next) => { setFarm(next); setErrors({ ...errors, size: "", unit: "" }); }} errors={errors} />
+          {errors.form ? <p className="notice notice-danger">{errors.form}</p> : null}
           <div className="form-actions">
-            <Button onClick={save}>Save and add farm</Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save and add farm"}
+            </Button>
           </div>
         </div>
       </Card>

@@ -13,8 +13,8 @@ const CONNECTED_PAGES = [
   /^\/admin\/farms(\/[^/]+)?$/,
   /^\/admin\/complaints(\/[^/]+)?$/,
   /^\/agent\/complaints(\/[^/]+)?$/,
-  /^\/agent\/farmers$/,
-  /^\/agent\/farms$/,
+  /^\/agent\/farmers(\/new)?$/,
+  /^\/agent\/farms(\/new)?$/,
   /^\/agent\/farmers\/[^/]+\/farms\/new$/,
 ];
 

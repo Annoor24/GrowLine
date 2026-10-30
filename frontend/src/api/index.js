@@ -270,6 +270,22 @@ export const api = {
     async () => unwrap(await request("/agent/farm-list/")).map(agentFarmRow),
     () => data.agentFarms.map((f) => ({ ...f, code: f.id, stage: "Vegetative" })),
   ),
+  // body: { full_name, phone_e164, state, lga, town_or_village, language, farms: [{ estimated_footprint }] }
+  agentRegisterFarmer: live(
+    async (body) => unwrap(await request("/agent/register/farmers/", { method: "POST", body })),
+    (body) => {
+      // Sample: 0803 555 0142 behaves as an already-registered number.
+      if (body.phone_e164.endsWith("8035550142")) {
+        throw new ApiError(400, { phone_e164: ["A farmer with this phone number already exists."] });
+      }
+      return { farmer: { code: "FMR-S001", name: body.full_name }, farms: body.farms.map((_, i) => ({ code: `FM-S00${i + 1}` })) };
+    },
+  ),
+  // body: { farmer_code, estimated_footprint }
+  agentAddFarm: live(
+    async (body) => unwrap(await request("/agent/add/farms/", { method: "POST", body })),
+    (body) => ({ code: "FM-S009", name: "Farm 2", farmer_code: body.farmer_code }),
+  ),
   agentFarmerDetail: live(
     async (code) => agentFarmerDetail(unwrap(await request(`/agent/farmer/${encodeURIComponent(code)}/`))),
     (code) => {
