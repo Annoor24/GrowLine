@@ -22,18 +22,17 @@ const FARMER_STEPS = [
   { title: "Permission", text: "Agree to GrowLine using your details for farm weather advice, then submit." },
 ];
 
-// DRAFT COPY: the Figma text for this section was too small to read; check with the designer.
 const AGENT_DUTIES = [
-  "Onboard farmers and mark their farms",
-  "Explain the messages and support farmers' decisions",
-  "Collect feedback on each advisory",
-  "Raise issues with the GrowLine team",
+  "Onboard farmers and mark their farm locations",
+  "Check SMS delivery and follow up where needed",
+  "Collect farmers’ questions, complaints and feedback",
+  "Explain the messages and support farmers’ decisions",
 ];
 const AGENT_RECEIVES = [
-  "A dashboard for your farmers and farms",
-  "Farm-specific spray advisories",
-  "Training and support from GrowLine",
-  "Tools to record farmer feedback",
+  "A dedicated agent dashboard",
+  "Support and orientation (to confirm)",
+  "A role in improving farming decisions",
+  "Account access only after approval",
 ];
 
 const APPLY_STEPS = [
@@ -51,21 +50,6 @@ const FAQS = [
   { q: "Can I apply from outside Southwest Nigeria?", a: "The initial focus is Lagos, Ogun, Oyo, Osun, Ondo and Ekiti. Expansion eligibility needs confirmation." },
   { q: "Is there a fee or payment for agents?", a: "Fees, compensation and benefits must be confirmed by the GrowLine team before publication." },
 ];
-
-// Stands in for the hero photo: the kind of SMS a farmer receives.
-function SmsPreview() {
-  return (
-    <div className="sms-preview" aria-hidden="true">
-      <div className="sms-phone">
-        <div className="sms-phone-top">GrowLine</div>
-        <div className="sms-bubble">
-          GrowLine: SAFE TO SPRAY today 7am–10am at North Plot. Low rain chance, light wind. Confidence: HIGH.
-        </div>
-        <div className="sms-bubble">Reply 1 if this advice was accurate, 2 if not.</div>
-      </div>
-    </div>
-  );
-}
 
 export default function Landing() {
   return (
@@ -88,7 +72,13 @@ export default function Landing() {
               </Button>
             </div>
           </div>
-          <SmsPreview />
+          <img
+            className="public-photo hero-photo"
+            src="/images/hero-farmer.jpg"
+            alt="A tomato farmer reading a message on his phone in his field"
+            width="1200"
+            height="734"
+          />
         </div>
       </section>
 
@@ -122,24 +112,17 @@ export default function Landing() {
               when to spray or wait.
             </p>
             <Button as={Link} to="/register">
-              Register my farm
+              Register your tomato farm
             </Button>
           </div>
-          <div className="window-card">
-            <strong>Today at North Plot</strong>
-            <div className="window-row">
-              <span>7am – 10am</span>
-              <span className="pill pill-success">Safe to spray</span>
-            </div>
-            <div className="window-row">
-              <span>11am – 3pm</span>
-              <span className="pill pill-warning">Spray with caution</span>
-            </div>
-            <div className="window-row">
-              <span>4pm – 7pm</span>
-              <span className="pill pill-danger">Do not spray</span>
-            </div>
-          </div>
+          <img
+            className="public-photo"
+            src="/images/spray-window.jpg"
+            alt="A phone held up in a tomato field showing a spray window advisory: wait to spray"
+            width="1139"
+            height="641"
+            loading="lazy"
+          />
         </div>
       </section>
 
@@ -216,7 +199,8 @@ export default function Landing() {
             <p className="eyebrow">Extension agents</p>
             <h2>Help farmers farm better. Be the person they trust.</h2>
             <p className="section-text">
-              Agents are trusted people in farming communities who help farmers join GrowLine and act on its advice.
+              Agents are farmers, cooperative leaders, NGO workers, government officers and others with real access to
+              farming communities.
             </p>
             <ul className="tick-list">
               {AGENT_DUTIES.map((item) => (
@@ -226,7 +210,7 @@ export default function Landing() {
           </div>
           <div className="public-card">
             <h3>What agents receive</h3>
-            <ul className="tick-list">
+            <ul className="tick-list dots">
               {AGENT_RECEIVES.map((item) => (
                 <li key={item}>{item}</li>
               ))}

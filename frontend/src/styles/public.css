@@ -153,42 +153,12 @@
   align-items: center;
 }
 
-.sms-preview {
-  background: linear-gradient(160deg, #2f6b46, #8fb35a);
-  border-radius: 16px;
-  min-height: 300px;
-  display: grid;
-  place-items: center;
-  padding: 32px;
-}
-
-.sms-phone {
+.public-photo {
+  display: block;
   width: 100%;
-  max-width: 260px;
-  background: #fff;
-  border-radius: 24px;
-  padding: 16px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.sms-phone-top {
-  text-align: center;
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--green-700);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
-}
-
-.sms-bubble {
-  background: var(--neutral-bg);
-  color: var(--text);
-  border-radius: 12px 12px 12px 4px;
-  padding: 10px 12px;
-  font-size: 12px;
+  height: auto;
+  border-radius: 16px;
+  object-fit: cover;
 }
 
 /* ---------- Sections ---------- */
@@ -266,26 +236,6 @@
   font-size: 13px;
 }
 
-.window-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  color: var(--green-700);
-}
-
-.window-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--text);
-}
-
 .tick-list {
   list-style: none;
   padding: 0;
@@ -301,6 +251,10 @@
   color: var(--green-500);
   font-weight: 700;
   margin-right: 8px;
+}
+
+.tick-list.dots li::before {
+  content: "•";
 }
 
 .faq-list {
@@ -606,11 +560,6 @@
   .hero-grid .row .btn,
   .closing .row .btn {
     width: 100%;
-  }
-
-  .sms-preview {
-    min-height: 240px;
-    padding: 20px;
   }
 
   .public-section,
