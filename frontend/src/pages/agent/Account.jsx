@@ -8,7 +8,8 @@ import Card from "../../components/Card.jsx";
 import FormField from "../../components/FormField.jsx";
 import Loading from "../../components/Loading.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
-import { isEmail, isNigerianPhone, passwordMessage } from "../../utils/validate.js";
+import { passwordMessage } from "../../utils/validate.js";
+import { saveProfile } from "../../utils/profile.js";
 
 const MIN_PASSWORD = 12;
 
@@ -48,6 +49,7 @@ export function EditProfile() {
   const { data, loading, error, reload } = useAsync(api.agentProfile);
   const [form, setForm] = useState(null);
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const values = form || { name: data.name, email: data.email, phone: data.phone };
   const set = (key) => (event) => {
@@ -55,14 +57,10 @@ export function EditProfile() {
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
 
-  function save() {
-    const next = {};
-    if (!values.name.trim()) next.name = "Enter your full name.";
-    if (!isEmail(values.email)) next.email = "Enter a valid email address.";
-    // The saved number is in +234 form, so only check it once it has been changed.
-    if (values.phone !== data.phone && !isNigerianPhone(values.phone)) {
-      next.phone = "Use a Nigerian mobile number, e.g. 0803 123 4567.";
-    }
+  async function save() {
+    setSaving(true);
+    const next = await saveProfile(values, data);
+    setSaving(false);
     setErrors(next);
     if (Object.keys(next).length === 0) navigate("/agent/profile");
   }
@@ -70,6 +68,7 @@ export function EditProfile() {
   return (
     <div className="stack">
       <PageHeader bar="Agent" title="Edit profile" subtitle="Update your contact details" />
+      {errors.form ? <p className="notice notice-danger">{errors.form}</p> : null}
       <Card title="Personal information">
         <div className="stack">
           <div className="form-grid">
@@ -78,7 +77,9 @@ export function EditProfile() {
             <FormField label="Phone number" value={values.phone} onChange={set("phone")} error={errors.phone} />
           </div>
           <div className="form-actions">
-            <Button onClick={save}>Save changes</Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
           </div>
         </div>
       </Card>

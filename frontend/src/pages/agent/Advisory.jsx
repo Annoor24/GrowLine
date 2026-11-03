@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/index.js";
 import { FEEDBACK_LABELS } from "../../api/adapters.js";
+import { ApiError } from "../../api/client.js";
 import useAsync from "../../hooks/useAsync.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -107,24 +108,60 @@ export function DailyFeedback() {
 
 // Advisory › Farm-Specific Advisory: the latest advisory for one farm, and sending it by SMS.
 export function FarmAdvisory() {
-  const { data, loading, error, reload } = useAsync(api.agentAdvisories);
+  const { data, loading, error, reload } = useAsync(api.agentAdvisoryFarms);
   const [searchParams] = useSearchParams();
   const [farmId, setFarmId] = useState(searchParams.get("farm") || "");
-  const [sent, setSent] = useState(false);
+  const [advisory, setAdvisory] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [sent, setSent] = useState(null);
+  const [problem, setProblem] = useState("");
   const [unchangedOpen, setUnchangedOpen] = useState(false);
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
+  if (data.length === 0) {
+    return (
+      <div className="stack">
+        <PageHeader bar="Agent" title="Farm-Specific Advisory" subtitle="Retrieve the latest advisory for one farm and send it to the farmer by SMS." />
+        <p className="notice notice-info">You have no farms yet. Register a farmer or add a farm first.</p>
+      </div>
+    );
+  }
 
-  const selected = data.find((item) => item.farmId === farmId) || data[0];
+  const selected = data.find((item) => item.farmId.toLowerCase() === farmId.toLowerCase()) || data[0];
+  const message = (err, fallback) => (err instanceof ApiError && err.data?.detail) || fallback;
 
-  function sendSms() {
-    // The backend decides whether the advisory changed since the last SMS.
-    if (selected.unchanged) setUnchangedOpen(true);
-    else setSent(true);
+  // Running the advisory saves a new one on the backend, so it only runs when the agent asks.
+  async function getAdvisory() {
+    setBusy("advisory");
+    setProblem("");
+    setSent(null);
+    try {
+      setAdvisory(await api.agentRunAdvisory(selected.farmId));
+    } catch (err) {
+      setAdvisory(null);
+      setProblem(message(err, "The advisory could not be retrieved. Please try again."));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function sendSms() {
+    setBusy("sms");
+    setProblem("");
+    try {
+      setSent(await api.agentSendAdvisorySms(selected.farmId, advisory.advisoryId));
+    } catch (err) {
+      // The backend refuses to resend advice that has not changed since the last SMS.
+      if (err instanceof ApiError && err.status === 409 && /already sent/i.test(err.data?.detail || "")) setUnchangedOpen(true);
+      else setProblem(message(err, "The SMS could not be sent. Please try again."));
+    } finally {
+      setBusy("");
+    }
   }
 
   return (
     <div className="stack">
       <PageHeader bar="Agent" title="Farm-Specific Advisory" subtitle="Retrieve the latest advisory for one farm and send it to the farmer by SMS." />
+      {problem ? <p className="notice notice-danger">{problem}</p> : null}
       <div className="grid grid-main-side">
         <Card title="Farm-specific guidance">
           <div className="stack">
@@ -134,37 +171,53 @@ export function FarmAdvisory() {
               value={selected.farmId}
               onChange={(e) => {
                 setFarmId(e.target.value);
-                setSent(false);
+                setAdvisory(null);
+                setSent(null);
+                setProblem("");
               }}
               options={data.map((item) => ({ value: item.farmId, label: item.label }))}
             />
             <div>
-              <StatusPill tone={directiveTone(selected.directive)}>{selected.directive.toUpperCase()}</StatusPill>
-            </div>
-            <h3>Forecast confidence: {selected.confidence}</h3>
-            <p className="muted">Check conditions before sharing this guidance with the farmer.</p>
-            <div>
               <div className="small muted">Farmer</div>
-              <strong>Assigned farmer • {selected.farmerPhone}</strong>
+              <strong>{selected.farmer}</strong>
             </div>
-            {sent ? <p className="notice notice-success">Advisory SMS submitted for {selected.label}.</p> : null}
-            <div>
-              <Button onClick={sendSms} disabled={sent}>
-                Send advisory SMS
+            {advisory ? (
+              <>
+                <div>
+                  <StatusPill tone={directiveTone(advisory.directive)}>{advisory.directive.toUpperCase()}</StatusPill>
+                </div>
+                <h3>Forecast confidence: {advisory.confidence}</h3>
+                <p className="muted">{advisory.note || "Check conditions before sharing this guidance with the farmer."}</p>
+                {advisory.blockedReason ? <p className="notice notice-warning">{advisory.blockedReason}</p> : null}
+                {sent ? (
+                  <p className="notice notice-success">
+                    Advisory SMS {sent.label ? sent.label.toLowerCase() : "submitted"}{sent.to ? ` to ${sent.to}` : ""} for {selected.label}.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+            <div className="row">
+              <Button variant={advisory ? "secondary" : "primary"} onClick={getAdvisory} disabled={Boolean(busy)}>
+                {busy === "advisory" ? "Getting advisory…" : advisory ? "Refresh advisory" : "Get latest advisory"}
               </Button>
+              {advisory ? (
+                <Button onClick={sendSms} disabled={Boolean(busy) || Boolean(sent) || Boolean(advisory.blockedReason)}>
+                  {busy === "sms" ? "Sending…" : "Send advisory SMS"}
+                </Button>
+              ) : null}
             </div>
           </div>
         </Card>
         <Card title="Advisory summary">
           <div className="kv">
             <span className="small muted">Directive</span>
-            <strong>{selected.directive}</strong>
+            <strong>{advisory ? advisory.directive : "—"}</strong>
             <span className="small muted">Confidence</span>
-            <span>
-              <StatusPill tone={ratingTone(selected.confidence)}>{selected.confidence}</StatusPill>
-            </span>
+            <span>{advisory ? <StatusPill tone={ratingTone(advisory.confidence)}>{advisory.confidence}</StatusPill> : "—"}</span>
+            <span className="small muted">Generated</span>
+            <span>{advisory ? advisory.generatedAt : "—"}</span>
             <span className="small muted">Last SMS</span>
-            <span>{sent ? "Submitted just now" : selected.lastSms}</span>
+            <span>{sent ? `${sent.label || "Submitted"} just now` : advisory ? advisory.lastSms : "—"}</span>
           </div>
           <p className="notice notice-info" style={{ marginTop: 16 }}>
             <strong>SMS validation</strong>
@@ -268,9 +321,9 @@ export function SmsDetails() {
 }
 
 // NOT IN THE DESIGN: the sidebar lists "Alert Monitoring" but no screen was provided.
-// This placeholder reuses the recent advisory activity until the designer supplies one.
+// This placeholder lists all advisory activity (the overview's "View all activity") until the designer supplies one.
 export function AlertMonitoring() {
-  const { data, loading, error, reload } = useAsync(api.agentOverview);
+  const { data, loading, error, reload } = useAsync(api.agentActivity);
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "farmer", label: "Farmer" },
@@ -283,7 +336,7 @@ export function AlertMonitoring() {
     <div className="stack">
       <PageHeader bar="Agent" title="Alert monitoring" subtitle="Placeholder screen: no design provided yet" />
       <Card>
-        <DataTable columns={columns} rows={data.recent} empty="No recent alert activity." />
+        <DataTable columns={columns} rows={data} empty="No advisory SMS has been sent yet." />
       </Card>
     </div>
   );

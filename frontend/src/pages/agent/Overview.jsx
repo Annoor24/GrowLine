@@ -30,7 +30,7 @@ export default function AgentOverview() {
         title={`Good morning, ${data.name}`}
         subtitle={`${data.dateLabel} · ${data.area}`}
         actions={[
-          <Button key="refresh" variant="secondary" onClick={() => window.location.reload()}>
+          <Button key="refresh" variant="secondary" onClick={reload}>
             Refresh
           </Button>,
           <Button key="add" as={Link} to="/agent/farms/new">
@@ -88,12 +88,12 @@ export default function AgentOverview() {
       <Card
         title="Recent advisory activity"
         actions={
-          <Link className="link-button" to="/agent/sms">
+          <Link className="link-button" to="/agent/alerts">
             View all activity
           </Link>
         }
       >
-        <DataTable columns={columns} rows={data.recent} />
+        <DataTable columns={columns} rows={data.recent} empty="No advisory SMS has been sent yet." />
       </Card>
 
       <div className="grid grid-2">

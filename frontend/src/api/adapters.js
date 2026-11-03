@@ -70,6 +70,81 @@ export const agentFarmerDetail = (f) => ({
   })),
 });
 
+// The engine's confidence values; the design calls them High, Moderate and Low.
+const CONFIDENCE_LABELS = { HIGH: "High", MODERATE: "Moderate", LOWER: "Low" };
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// Agent: GET /agent/advisories/activity/ rows (also the dashboard's recent activity).
+export const activityRow = (a, index) => ({
+  id: `${a.farm_id}-${a.sent_at}-${index}`,
+  farmer: a.farmer || "—",
+  farmId: a.farm_id,
+  rating: a.risk_display || "—",
+  sms: a.sms_status ? titleCase(a.sms_status) : "—",
+  api: apiLabel(a.weather_api),
+  sentAt: formatWhen(a.sent_at),
+});
+
+// Agent: GET /agent/dashboard/, in the shape the Overview page uses.
+export function agentDashboard(d) {
+  const { greeting = {}, priorities = {}, stats = {}, advisory_summary: summary = {}, registration = {} } = d;
+  const date = greeting.date ? new Date(`${greeting.date}T12:00:00`) : new Date();
+  const items = [];
+  if (priorities.high_risk_farms) {
+    items.push({ tone: "danger", title: `${plural(priorities.high_risk_farms, "farm")} with a Do not spray advisory`, note: "Review advisories before recommending spraying" });
+  }
+  if (priorities.failed_sms) {
+    items.push({ tone: "warning", title: `${plural(priorities.failed_sms, "SMS message")} failed`, note: "Review delivery failures and retry eligible messages" });
+  }
+  if (items.length === 0) items.push({ tone: "success", title: "Nothing needs attention", note: "No high-risk farms or failed SMS right now" });
+  return {
+    name: greeting.name || "",
+    dateLabel: date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+    area: greeting.area || "—",
+    priorities: items,
+    prioritiesBadge: `${priorities.need_attention ?? 0} need attention`,
+    stats: [
+      { label: "Assigned farmers", value: number(stats.assigned_farmers), note: `${stats.registered_this_month ?? 0} registered this month` },
+      { label: "Tomato farms", value: number(stats.tomato_farms), note: `${stats.gps_verified ?? 0} GPS verified` },
+      { label: "Advisories sent today", value: number(stats.advisories_sent_today), note: `${stats.delivered_today ?? 0} delivered · ${stats.failed_today ?? 0} failed` },
+      { label: "Feedback response", value: stats.feedback_response_rate == null ? "—" : `${stats.feedback_response_rate}%`, note: "Last 7 days" },
+    ],
+    summary: { total: summary.monitored_farms ?? 0, high: summary.high ?? 0, moderate: summary.moderate ?? 0, low: summary.low ?? 0 },
+    recent: (d.recent_activity || []).map(activityRow),
+    registration: { verified: registration.gps_verified ?? 0, awaiting: registration.gps_pending ?? 0 },
+  };
+}
+
+// Agent: GET /agent/farms/ (the "Choose farm" dropdown).
+export const advisoryFarmOption = (f) => ({
+  farmId: f.code,
+  label: f.label || f.code,
+  farmer: f.farmer_name || "—",
+  smsReady: Boolean(f.sms_ready),
+});
+
+// Agent: POST /agent/farms/<code>/advisory/ (runs the engine for one farm).
+export const farmAdvisoryResult = (r) => ({
+  advisoryId: r.advisory?.id,
+  directive: DIRECTIVE_LABELS[r.advisory?.directive] || r.advisory?.directive_label || "—",
+  confidence: CONFIDENCE_LABELS[r.advisory?.confidence] || r.advisory?.confidence_label || "—",
+  generatedAt: formatWhen(r.advisory?.generated_at),
+  note: r.note || "",
+  lastSms: r.sms?.already_sent ? `${r.sms.label}${r.sms.sent_at ? ` • ${formatWhen(r.sms.sent_at)}` : ""}` : "Not sent yet",
+  canSend: Boolean(r.sms?.can_send),
+  alreadySent: Boolean(r.sms?.already_sent),
+  blockedReason: r.sms?.blocked_reason || "",
+});
+
+// GET /user/ (the signed-in user's own profile; agents and the super admin).
+export const userProfile = (u) => ({
+  name: u.fullname || "",
+  phone: u.phone && u.phone !== "None" ? u.phone : "",
+  role: u.role === "admin" ? "Super Admin" : "Extension Agent",
+  agentId: u.agentID || "",
+  area: u.area || "",
+});
+
 // Agent: GET /agent/ (the signed-in agent's profile and coverage).
 export const agentProfile = (p) => ({
   name: p.full_name,

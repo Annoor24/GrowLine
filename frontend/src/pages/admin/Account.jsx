@@ -7,7 +7,7 @@ import Card from "../../components/Card.jsx";
 import FormField from "../../components/FormField.jsx";
 import Loading from "../../components/Loading.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
-import { isEmail, isNigerianPhone } from "../../utils/validate.js";
+import { saveProfile } from "../../utils/profile.js";
 
 export function AdminProfile() {
   const { data, loading, error, reload } = useAsync(api.adminProfile);
@@ -31,7 +31,7 @@ export function AdminProfile() {
       </Card>
       <Card title="Administrator details">
         <div className="form-grid">
-          <FormField label="Admin ID (read only)" value={data.adminId} readOnly />
+          <FormField label="Admin ID (read only)" value={data.adminId || "—"} readOnly />
           <FormField label="Role (read only)" value={data.role} readOnly />
         </div>
       </Card>
@@ -44,6 +44,7 @@ export function AdminEditProfile() {
   const { data, loading, error, reload } = useAsync(api.adminProfile);
   const [form, setForm] = useState(null);
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const values = form || { name: data.name, email: data.email, phone: data.phone };
   const set = (key) => (event) => {
@@ -51,14 +52,10 @@ export function AdminEditProfile() {
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
 
-  function save() {
-    const next = {};
-    if (!values.name.trim()) next.name = "Enter your full name.";
-    if (!isEmail(values.email)) next.email = "Enter a valid email address.";
-    // The sample phone number is a placeholder, so only check it once it has been changed.
-    if (values.phone !== data.phone && !isNigerianPhone(values.phone)) {
-      next.phone = "Use a Nigerian mobile number, e.g. 0803 123 4567.";
-    }
+  async function save() {
+    setSaving(true);
+    const next = await saveProfile(values, data);
+    setSaving(false);
     setErrors(next);
     if (Object.keys(next).length === 0) navigate("/admin/profile");
   }
@@ -66,6 +63,7 @@ export function AdminEditProfile() {
   return (
     <div className="stack">
       <PageHeader bar="Super Admin" title="Edit Profile" subtitle="Manage your personal contact information" />
+      {errors.form ? <p className="notice notice-danger">{errors.form}</p> : null}
       <Card title="Personal information">
         <div className="stack">
           <div className="form-grid">
@@ -74,7 +72,9 @@ export function AdminEditProfile() {
             <FormField label="Phone number" value={values.phone} onChange={set("phone")} error={errors.phone} />
           </div>
           <div className="form-actions">
-            <Button onClick={save}>Save changes</Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
             <Button variant="secondary" onClick={() => navigate("/admin/profile")}>
               Cancel
             </Button>

@@ -1,6 +1,12 @@
 import * as data from "../mocks/data.js";
 import { ApiError, fetchAllPages, request, USE_MOCKS } from "./client.js";
+import { readSession } from "./session.js";
 import {
+  activityRow,
+  advisoryFarmOption,
+  agentDashboard,
+  farmAdvisoryResult,
+  userProfile,
   agentDetail,
   agentFarmerDetail,
   agentFarmerRow,
@@ -231,7 +237,11 @@ export const api = {
   // ---------- Not connected yet (no backend endpoint): always sample data ----------
   adminOverview: sample(data.adminOverview),
   adminFarmerAssignments: sample(data.adminFarmerAssignments),
-  adminProfile: sample(data.adminProfile),
+  // GET /user/ has no email or admin ID, so the email comes from the login.
+  adminProfile: live(
+    async () => ({ ...userProfile(await request("/user/")), email: readSession()?.email || "", adminId: "" }),
+    () => data.adminProfile,
+  ),
   adminAlerts: sample(data.adminAlerts),
   adminAlertDetail: sample(data.adminAlertDetail),
   adminReports: sample(data.adminReports),
@@ -290,7 +300,12 @@ export const api = {
     (code, message) => followUpMessage(sampleReply(code, message, "superadmin")),
   ),
 
-  agentOverview: sample(data.agentOverview),
+  agentOverview: live(async () => agentDashboard(unwrap(await request("/agent/dashboard/"))), () => data.agentOverview),
+  // Every advisory that was sent by SMS, newest first ("View all activity").
+  agentActivity: live(
+    async () => unwrap(await request("/agent/advisories/activity/")).map(activityRow),
+    () => data.agentOverview.recent,
+  ),
   // ---------- Agent farmers and farms ----------
   agentFarmers: live(
     async () => unwrap(await request("/agent/farmer-list/")).map(agentFarmerRow),
@@ -332,7 +347,30 @@ export const api = {
       };
     },
   ),
-  agentAdvisories: sample(data.agentAdvisories),
+  // ---------- Agent farm-specific advisory ----------
+  agentAdvisoryFarms: live(
+    async () => unwrap(await request("/agent/farms/")).map(advisoryFarmOption),
+    () => data.agentAdvisories.map(({ farmId, label, farmer }) => ({ farmId, label, farmer, smsReady: true })),
+  ),
+  // Runs the advisory engine for one farm (saves a new advisory; may fetch fresh weather).
+  agentRunAdvisory: live(
+    async (code) => farmAdvisoryResult(await request(`/agent/farms/${encodeURIComponent(code)}/advisory/`, { method: "POST" })),
+    (code) => {
+      const farm = data.agentAdvisories.find((item) => item.farmId === code);
+      if (!farm) throw new ApiError(404, { detail: "Not found." });
+      return { advisoryId: farm.farmId, directive: farm.directive, confidence: farm.confidence, generatedAt: "Just now", note: "Check conditions before sharing with farmers.", lastSms: farm.lastSms, canSend: !farm.unchanged, alreadySent: farm.unchanged, blockedReason: "" };
+    },
+  ),
+  // 409 { detail } when the advice is unchanged since the last SMS, or changed since it was run.
+  agentSendAdvisorySms: live(
+    async (code, advisoryId) =>
+      (await request(`/agent/farms/${encodeURIComponent(code)}/advisory/sms/`, { method: "POST", body: { advisory_id: advisoryId } })).sms,
+    (code) => {
+      const farm = data.agentAdvisories.find((item) => item.farmId === code);
+      if (farm.unchanged) throw new ApiError(409, { detail: "This advice was already sent and has not changed." });
+      return { label: "Submitted", to: farm.farmerPhone };
+    },
+  ),
   // ---------- Agent daily feedback (advisories from the last 24 hours) ----------
   agentDailyFeedback: live(
     async () => unwrap(await request("/agent/advisories/daily-feedback/")).results.map(dailyFeedbackRow),
@@ -422,6 +460,11 @@ export const api = {
     (code, message) => followUpMessage(sampleReply(code, message, "agent")),
   ),
   agentProfile: live(async () => agentProfile(unwrap(await request("/agent/"))), () => data.agentProfile),
+  // Agents and the super admin. body: { fullname, email, phone (+234…) }
+  updateProfile: live(
+    (body) => request("/user/", { method: "PATCH", body }),
+    (body) => ({ message: "User profile updated successfully.", data: body }),
+  ),
 
   // ---------- Agent and super admin ----------
   // body: { oldPassword, newPassword1, newPassword2 }. Sample: the current password "wrong" is rejected.
