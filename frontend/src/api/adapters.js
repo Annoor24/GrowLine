@@ -70,6 +70,62 @@ export const agentFarmerDetail = (f) => ({
   })),
 });
 
+// Agent: GET /agent/ (the signed-in agent's profile and coverage).
+export const agentProfile = (p) => ({
+  name: p.full_name,
+  email: p.email || "—",
+  phone: p.phone || "—",
+  agentId: p.agent_code,
+  assignedFarmers: p.coverage?.farmers_assigned ?? 0,
+  registeredFarms: p.coverage?.registered_farms ?? 0,
+  status: titleCase(p.status),
+  location: p.area || "—",
+  memberSince: formatDate(p.member_since),
+});
+
+// Agent: GET /agent/notifications/ rows.
+export const notificationRow = (n) => ({
+  id: n.id,
+  title: n.title,
+  body: n.message,
+  when: formatWhen(n.created_at),
+  read: Boolean(n.is_read),
+});
+
+// Super admin: GET /superadmin/notifications/ rows (and the send response). The counts arrive as text.
+export const notificationBatchRow = (n) => ({
+  id: n.id,
+  title: n.title,
+  recipients: n.recipientsCount || "—",
+  dashboard: n.dashboardCount || "—",
+  email: n.emailCount || "—",
+  sent: formatWhen(n.sent_at),
+});
+
+// Agent daily feedback: the API stores in_accurate; the page says Inaccurate.
+export const FEEDBACK_LABELS = { not_collected: "Not collected", accurate: "Accurate", in_accurate: "Inaccurate" };
+
+// "Today, 10:20 AM" / "Yesterday, 5:10 PM" / "30 Oct, 5:10 PM"
+export function formatFetched(iso) {
+  const date = new Date(iso);
+  if (!iso || Number.isNaN(date.getTime())) return "—";
+  const time = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(date).setHours(0, 0, 0, 0)) / 86400000);
+  if (days === 0) return `Today, ${time}`;
+  if (days === 1) return `Yesterday, ${time}`;
+  return `${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, ${time}`;
+}
+
+// Agent: GET /agent/advisories/daily-feedback/ rows (and the PATCH response).
+export const dailyFeedbackRow = (a) => ({
+  id: a.id,
+  farm: a.farm_name || "—",
+  farmId: a.farm_code,
+  directive: DIRECTIVE_LABELS[a.directive_type] || a.directive_display || "—",
+  fetched: formatFetched(a.generated_at),
+  feedback: a.feedback,
+});
+
 // Agent complaints: the API returns stored values, the page shows friendlier labels.
 export const COMPLAINT_STATUS_LABELS = { pending: "Open", on_going: "In progress", closed: "Resolved" };
 
@@ -205,13 +261,20 @@ export const farmerDetail = (f) => ({
 });
 
 // ----- farms -----
+// The backend sends "longitude, latitude"; the page shows "latitude, longitude" to 6 decimals.
+export function latLng(coordinates) {
+  const [lng, lat] = String(coordinates ?? "").split(",").map((part) => Number(part.trim()));
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "—";
+  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
 export const farmRow = (f) => ({
   id: f.id,
   code: f.farm_id,
   farmerCode: f.farmer_id,
   crop: f.crop,
   size: `${f.size_hectares} ha`,
-  coordinates: f.coordinates,
+  coordinates: latLng(f.coordinates),
   status: titleCase(f.gps_Status),
 });
 
@@ -229,7 +292,7 @@ export const farmDetail = (f) => ({
   farmerName: f.farmer_name,
   crop: f.crop,
   size: `${f.size_hectares} ha`,
-  coordinates: f.coordinates,
+  coordinates: latLng(f.coordinates),
   status: titleCase(f.gps_Status),
   position: f.position || null,
   locationCaptured: Boolean(f.location_captured),

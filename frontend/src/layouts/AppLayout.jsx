@@ -7,7 +7,7 @@ import Icon from "../components/Icon.jsx";
 // Pages that read from the real backend. Everything else still shows sample data.
 const CONNECTED_PAGES = [
   /^\/admin\/agents$/,
-  /^\/admin\/agents\/invitations$/,
+  /^\/admin\/agents\/(invitations|new)$/,
   /^\/admin\/agents\/\d+$/,
   /^\/admin\/farmers(\/[^/]+)?$/,
   /^\/admin\/farms(\/[^/]+)?$/,
@@ -16,6 +16,11 @@ const CONNECTED_PAGES = [
   /^\/agent\/farmers(\/new)?$/,
   /^\/agent\/farms(\/new)?$/,
   /^\/agent\/farmers\/[^/]+\/farms\/new$/,
+  /^\/agent\/advisory\/daily$/,
+  /^\/agent\/notifications$/,
+  /^\/agent\/profile$/,
+  /^\/(agent|admin)\/settings\/password$/,
+  /^\/admin\/notifications(\/new)?$/,
 ];
 
 // nav / accountNav: [{ to, label, icon?, end?, children?: [{ to, label }] }]

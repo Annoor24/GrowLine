@@ -5,9 +5,11 @@ import {
   agentFarmerDetail,
   agentFarmerRow,
   agentFarmRow,
+  agentProfile,
   agentRow,
   complaintRow,
   complaintThread,
+  dailyFeedbackRow,
   followUpMessage,
   farmDetail,
   farmRow,
@@ -16,6 +18,8 @@ import {
   farmerRow,
   farmerStatTiles,
   invitationRow,
+  notificationBatchRow,
+  notificationRow,
 } from "./adapters.js";
 
 // Every screen reads through this file.
@@ -183,6 +187,16 @@ export const api = {
     async (id) => agentDetail(await request(`/superadmin/agent/${id}/`)),
     sampleAgentDetail,
   ),
+  // body: { username, fullname, email, phone (+234…), area }. The backend emails the set-password link.
+  adminCreateAgent: live(
+    (body) => request("/register-agent/", { method: "POST", body }),
+    (body) => {
+      if (data.adminAgents.some((a) => a.email === body.email)) {
+        throw new ApiError(400, { email: ["A user with this email already exists."] });
+      }
+      return { message: `Registration successful for Agent ${body.fullname}.` };
+    },
+  ),
   adminInvitations: live(
     async () => (await request("/superadmin/agent-invite-list/")).map(invitationRow),
     () => data.adminInvitations,
@@ -221,11 +235,27 @@ export const api = {
   adminAlerts: sample(data.adminAlerts),
   adminAlertDetail: sample(data.adminAlertDetail),
   adminReports: sample(data.adminReports),
-  adminNotifications: sample(data.adminNotifications),
+  adminNotifications: live(
+    async () => {
+      const { rows } = await fetchAllPages("/superadmin/notifications/");
+      return rows.map(notificationBatchRow);
+    },
+    () => data.adminNotifications.map((n) => ({ ...n })),
+  ),
+  // body: { title, message, audience: "all" | "selected", agents: [agent ids] }. Returns the new row.
+  adminSendNotification: live(
+    async (body) => notificationBatchRow(unwrap(await request("/superadmin/notifications/send/", { method: "POST", body }))),
+    (body) => {
+      const recipients = body.audience === "all" ? "All agents" : `${body.agents.length} Agents`;
+      const row = { id: `AN-${Date.now()}`, title: body.title, recipients, dashboard: "0 delivered", email: "0 delivered", sent: "Just now" };
+      data.adminNotifications.unshift(row);
+      return row;
+    },
+  ),
 
   // ---------- Complaints: super admin ----------
   adminComplaintStats: live(
-    async () => unwrap(await request("/admin/complaints/stats/")),
+    async () => unwrap(await request("/superadmin/complaints/stats/")),
     () => ({
       open_complaints: countBy(data.complaintStore, "pending"),
       in_progress: countBy(data.complaintStore, "on_going"),
@@ -239,24 +269,24 @@ export const api = {
       if (search) params.set("search", search);
       if (status) params.set("status", status);
       if (priority) params.set("priority", priority);
-      const { rows } = await fetchAllPages(`/admin/complaints/?${params}`);
+      const { rows } = await fetchAllPages(`/superadmin/complaints/?${params}`);
       return rows.map(complaintRow);
     },
     (filters) => filterComplaints(data.complaintStore, filters).map(complaintRow),
   ),
   adminComplaintDetail: live(
-    async (code) => complaintThread(unwrap(await request(`/admin/complaints/${encodeURIComponent(code)}/`))),
+    async (code) => complaintThread(unwrap(await request(`/superadmin/complaints/${encodeURIComponent(code)}/`))),
     (code) => complaintThread(findComplaint(code)),
   ),
   // changes: { status?, priority? }
   adminUpdateComplaint: live(
     async (code, changes) =>
-      complaintThread(unwrap(await request(`/admin/complaints/${encodeURIComponent(code)}/`, { method: "PATCH", body: changes }))),
+      complaintThread(unwrap(await request(`/superadmin/complaints/${encodeURIComponent(code)}/`, { method: "PATCH", body: changes }))),
     (code, changes) => complaintThread(Object.assign(findComplaint(code), changes)),
   ),
   adminReplyComplaint: live(
     async (code, message) =>
-      followUpMessage(unwrap(await request(`/complaints/${encodeURIComponent(code)}/follow-ups/`, { method: "POST", body: { message } }))),
+      followUpMessage(unwrap(await request(`/superadmin/complaints/${encodeURIComponent(code)}/follow-ups/`, { method: "POST", body: { message } }))),
     (code, message) => followUpMessage(sampleReply(code, message, "superadmin")),
   ),
 
@@ -303,9 +333,28 @@ export const api = {
     },
   ),
   agentAdvisories: sample(data.agentAdvisories),
-  agentDailyFeedback: sample(data.agentDailyFeedback),
+  // ---------- Agent daily feedback (advisories from the last 24 hours) ----------
+  agentDailyFeedback: live(
+    async () => unwrap(await request("/agent/advisories/daily-feedback/")).results.map(dailyFeedbackRow),
+    () => data.agentDailyFeedback.map((row) => ({ ...row })),
+  ),
+  // feedback: not_collected | accurate | in_accurate. Returns the updated row.
+  agentUpdateFeedback: live(
+    async (id, feedback) =>
+      dailyFeedbackRow(unwrap(await request(`/agent/advisories/${id}/feedback/`, { method: "PATCH", body: { feedback } }))),
+    (id, feedback) => Object.assign(data.agentDailyFeedback.find((row) => row.id === id), { feedback }),
+  ),
   agentSmsMessages: sample(data.agentSmsMessages),
-  agentNotifications: sample(data.agentNotifications),
+  // ---------- Agent notifications ----------
+  agentNotifications: live(
+    async () => unwrap(await request("/agent/notifications/")).map(notificationRow),
+    () => data.agentNotifications.map((n) => ({ ...n })),
+  ),
+  // POST with no body marks a notification read.
+  agentMarkNotificationRead: live(
+    async (id) => notificationRow(unwrap(await request(`/agent/notifications/${id}/`, { method: "POST" }))),
+    (id) => Object.assign(data.agentNotifications.find((n) => n.id === id), { read: true }),
+  ),
   // ---------- Complaints: extension agent ----------
   // Agent complaints page: the four cards and the "My complaints" table.
   agentComplaintStats: live(
@@ -332,11 +381,11 @@ export const api = {
     },
     sampleMyComplaints,
   ),
-  // There is no agent endpoint for one complaint: GET /complaints/ returns all of the agent's
+  // There is no agent endpoint for one complaint: GET /agent/complain/ returns all of the agent's
   // complaints with their messages, so pick the one asked for.
   agentComplaintDetail: live(
     async (code) => {
-      const all = unwrap(await request("/complaints/"));
+      const all = unwrap(await request("/agent/complain/"));
       const found = (all || []).find((c) => String(c.code).toLowerCase() === String(code).toLowerCase());
       if (!found) throw new ApiError(404, { detail: "Not found." });
       return complaintThread(found);
@@ -349,7 +398,7 @@ export const api = {
   ),
   // body: { subject, priority, message }. Returns the new complaint with its first message.
   agentSubmitComplaint: live(
-    async (body) => complaintThread(unwrap(await request("/complaints/", { method: "POST", body }))),
+    async (body) => complaintThread(unwrap(await request("/agent/complain/", { method: "POST", body }))),
     (body) => {
       sampleCounter += 1;
       const code = `CMP-0${sampleCounter}`;
@@ -369,20 +418,30 @@ export const api = {
   ),
   agentReplyComplaint: live(
     async (code, message) =>
-      followUpMessage(unwrap(await request(`/complaints/${encodeURIComponent(code)}/follow-ups/`, { method: "POST", body: { message } }))),
+      followUpMessage(unwrap(await request(`/agent/complaints/${encodeURIComponent(code)}/follow-ups/`, { method: "POST", body: { message } }))),
     (code, message) => followUpMessage(sampleReply(code, message, "agent")),
   ),
-  agentProfile: sample(data.agentProfile),
+  agentProfile: live(async () => agentProfile(unwrap(await request("/agent/"))), () => data.agentProfile),
+
+  // ---------- Agent and super admin ----------
+  // body: { oldPassword, newPassword1, newPassword2 }. Sample: the current password "wrong" is rejected.
+  changePassword: live(
+    (body) => request("/change-password/", { method: "POST", body }),
+    (body) => {
+      if (body.oldPassword === "wrong") throw new ApiError(400, { oldPassword: ["Old password is incorrect."] });
+      return { message: "Password changed successfully." };
+    },
+  ),
 
   // ---------- Public farmer registration (no login) ----------
   // Step 1: the farmer's details. Returns { token, expires_in } for step 2.
   registerFarmerDetails: live(
-    (body) => request("/register/farmer/", { method: "POST", body, auth: false }),
+    (body) => request("/farm/register/farmer/", { method: "POST", body, auth: false }),
     () => ({ token: "sample-token", expires_in: 7200 }),
   ),
   // Step 2: one or more farms. The backend builds each farm's polygon from the point and size.
   registerFarms: live(
-    (token, farms) => request("/register/farm/", { method: "POST", body: { token, farms }, auth: false }),
+    (token, farms) => request("/farm/register/farm/", { method: "POST", body: { token, farms }, auth: false }),
     (token, farms) => ({
       farms: farms.map((_, i) => ({ code: `FM-S00${i + 1}`, name: `Farm ${i + 1}`, duplicate: false })),
       farms_registered: farms.length,

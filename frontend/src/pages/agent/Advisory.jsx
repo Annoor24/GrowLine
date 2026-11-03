@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/index.js";
+import { FEEDBACK_LABELS } from "../../api/adapters.js";
 import useAsync from "../../hooks/useAsync.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -11,7 +12,6 @@ import Modal from "../../components/Modal.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import StatusPill, { ratingTone } from "../../components/StatusPill.jsx";
 
-const FEEDBACK_OPTIONS = ["Not collected", "Accurate", "Inaccurate"];
 
 function directiveTone(directive) {
   const key = directive.toLowerCase();
@@ -24,7 +24,26 @@ function directiveTone(directive) {
 export function DailyFeedback() {
   const { data, loading, error, reload } = useAsync(api.agentDailyFeedback);
   const [changes, setChanges] = useState({});
+  const [problem, setProblem] = useState("");
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
+
+  // Saves as soon as the agent picks a status; puts the old one back if the save fails.
+  async function changeFeedback(row, value) {
+    const previous = changes[row.id] || row.feedback;
+    setProblem("");
+    setChanges((current) => ({ ...current, [row.id]: value }));
+    try {
+      const updated = await api.agentUpdateFeedback(row.id, value);
+      setChanges((current) => ({ ...current, [row.id]: updated.feedback }));
+    } catch (err) {
+      setChanges((current) => ({ ...current, [row.id]: previous }));
+      setProblem(
+        err.status === 404
+          ? `The advisory for ${row.farmId} is more than 24 hours old and can no longer be updated. Refresh the list.`
+          : "The feedback could not be saved. Please try again.",
+      );
+    }
+  }
 
   const columns = [
     {
@@ -57,8 +76,8 @@ export function DailyFeedback() {
           kind="select"
           aria-label={`Feedback status for ${row.farmId}`}
           value={changes[row.id] || row.feedback}
-          onChange={(e) => setChanges({ ...changes, [row.id]: e.target.value })}
-          options={FEEDBACK_OPTIONS.map((option) => ({ value: option, label: option }))}
+          onChange={(e) => changeFeedback(row, e.target.value)}
+          options={Object.entries(FEEDBACK_LABELS).map(([value, label]) => ({ value, label }))}
         />
       ),
     },
@@ -76,6 +95,7 @@ export function DailyFeedback() {
           </Button>
         }
       >
+        {problem ? <p className="notice notice-danger">{problem}</p> : null}
         <DataTable columns={columns} rows={data} empty="No advisories were fetched in the last 24 hours." />
         <p className="hint" style={{ marginTop: 12 }}>
           Status options: Not collected • Accurate • Inaccurate

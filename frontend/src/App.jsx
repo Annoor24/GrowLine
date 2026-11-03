@@ -140,7 +140,7 @@ export default function App() {
           <Route path="complaints" element={<AdminComplaints />} />
           <Route path="complaints/:id" element={<AdminComplaintDetail />} />
           <Route path="settings" element={<AdminSettings />} />
-          <Route path="settings/password" element={<ChangePassword backTo="/admin/settings" />} />
+          <Route path="settings/password" element={<ChangePassword backTo="/admin/settings" bar="Admin" />} />
           <Route path="profile" element={<AdminProfile />} />
           <Route path="profile/edit" element={<AdminEditProfile />} />
         </Route>

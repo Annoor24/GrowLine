@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/index.js";
-import { isEmail, isNigerianPhone } from "../../utils/validate.js";
+import { ApiError } from "../../api/client.js";
+import { isEmail, isNigerianPhone, toE164 } from "../../utils/validate.js";
 import useAsync from "../../hooks/useAsync.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -262,7 +263,9 @@ export function CreateAgent() {
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
 
-  function submit(event) {
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event) {
     event.preventDefault();
     const next = {};
     if (!form.name.trim()) next.name = "Enter the agent's full name.";
@@ -270,12 +273,38 @@ export function CreateAgent() {
     if (!isNigerianPhone(form.phone)) next.phone = "Use a Nigerian mobile number, e.g. 0803 123 4567.";
     if (!form.area.trim()) next.area = "Enter the agent's assigned area.";
     setErrors(next);
-    if (Object.keys(next).length === 0) navigate("/admin/agents/invitations");
+    if (Object.keys(next).length > 0) return;
+
+    setSaving(true);
+    try {
+      // The backend needs a username; the design has none, so the (unique) email is used.
+      const email = form.email.trim().toLowerCase();
+      await api.adminCreateAgent({ username: email, fullname: form.name.trim(), email, phone: toE164(form.phone), area: form.area.trim() });
+      navigate("/admin/agents/invitations");
+    } catch (err) {
+      const body = err instanceof ApiError && err.status === 400 ? err.data : null;
+      const first = (value) => (Array.isArray(value) ? String(value[0]) : value ? String(value) : "");
+      const found = {
+        name: first(body?.fullname),
+        email: first(body?.email) || first(body?.username),
+        phone: first(body?.phone),
+        area: first(body?.area),
+      };
+      if (!Object.values(found).some(Boolean)) {
+        found.form = err instanceof ApiError && err.status === 0
+          ? "We could not reach GrowLine. Check your internet connection and try again."
+          : "The agent could not be created. Please try again.";
+      }
+      setErrors(found);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div className="stack">
       <PageHeader bar="Admin" title="Extension Agents · Add New Agent" subtitle="Create an agent and send a secure activation link." />
+      {errors.form ? <p className="notice notice-danger">{errors.form}</p> : null}
       <Card title="Agent account details" subtitle="Only Super Admins can create Extension Agent accounts.">
         <form className="stack" onSubmit={submit}>
           <div className="form-grid">
@@ -290,7 +319,9 @@ export function CreateAgent() {
             <strong>Invitation policy.</strong> Single-use activation link · Expires in 48 hours · Agent sets their own password.
           </p>
           <div className="form-actions">
-            <Button type="submit">Create & send invitation</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Sending…" : "Create & send invitation"}
+            </Button>
             <Button variant="secondary" onClick={() => navigate("/admin/agents")}>
               Cancel
             </Button>

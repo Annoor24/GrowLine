@@ -242,26 +242,64 @@ export function AdminNotifications() {
   );
 }
 
+const TITLE_MAX = 150;
+
 export function ComposeNotification() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ recipients: "all", title: "", message: "" });
+  const agents = useAsync(api.adminAgents);
+  const [form, setForm] = useState({ recipients: "all", title: "", message: "", agents: [] });
   const [errors, setErrors] = useState({});
+  const [sending, setSending] = useState(false);
   const set = (key) => (event) => {
     setForm({ ...form, [key]: event.target.value });
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
 
-  function send() {
+  // The backend only notifies active agents.
+  const activeAgents = (agents.data || []).filter((agent) => agent.status === "Active");
+  const recipientCount = form.recipients === "all" ? activeAgents.length : form.agents.length;
+
+  function toggleAgent(id) {
+    const chosen = form.agents.includes(id) ? form.agents.filter((x) => x !== id) : [...form.agents, id];
+    setForm({ ...form, agents: chosen });
+    if (errors.agents) setErrors({ ...errors, agents: "" });
+  }
+
+  async function send() {
     const next = {};
     if (!form.title.trim()) next.title = "Enter a title for the notification.";
     if (!form.message.trim()) next.message = "Write the message agents should see.";
+    if (form.recipients === "selected" && form.agents.length === 0) next.agents = "Select at least one agent.";
     setErrors(next);
-    if (Object.keys(next).length === 0) navigate("/admin/notifications");
+    if (Object.keys(next).length > 0) return;
+
+    setSending(true);
+    try {
+      await api.adminSendNotification({
+        title: form.title.trim(),
+        message: form.message.trim(),
+        audience: form.recipients,
+        agents: form.recipients === "selected" ? form.agents : [],
+      });
+      navigate("/admin/notifications");
+    } catch (err) {
+      const body = err instanceof ApiError ? err.data : null;
+      const first = (value) => (Array.isArray(value) ? String(value[0]) : value ? String(value) : "");
+      setErrors({
+        title: first(body?.title),
+        message: first(body?.message),
+        agents: first(body?.agents),
+        form: first(body?.detail) || (body?.title || body?.message || body?.agents ? "" : "The notification could not be sent. Please try again."),
+      });
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
     <div className="stack">
       <PageHeader bar="Admin" title="Send agent notification" subtitle="Send to one, selected or all extension agents" />
+      {errors.form ? <p className="notice notice-danger">{errors.form}</p> : null}
       <div className="grid grid-main-side">
         <Card title="New dashboard notification">
           <div className="stack">
@@ -275,9 +313,29 @@ export function ComposeNotification() {
                 { value: "selected", label: "Selected agents" },
               ]}
             />
+            {form.recipients === "selected" ? (
+              <fieldset className="check-group">
+                <legend>Choose agents</legend>
+                {agents.data ? (
+                  <div className="stack" style={{ gap: 8 }}>
+                    {activeAgents.length === 0 ? <span className="muted">There are no active agents.</span> : null}
+                    {activeAgents.map((agent) => (
+                      <label key={agent.id} className="check">
+                        <input type="checkbox" checked={form.agents.includes(agent.id)} onChange={() => toggleAgent(agent.id)} />
+                        <span>{agent.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <Loading error={agents.error} onRetry={agents.reload} />
+                )}
+                {errors.agents ? <span className="error-text">{errors.agents}</span> : null}
+              </fieldset>
+            ) : null}
             <FormField
               label="Notification title"
               value={form.title}
+              maxLength={TITLE_MAX}
               onChange={set("title")}
               placeholder="Important platform update"
               error={errors.title}
@@ -294,7 +352,9 @@ export function ComposeNotification() {
               <StatusPill tone="success">Email backup enabled</StatusPill>
             </div>
             <div className="form-actions">
-              <Button onClick={send}>Send notification</Button>
+              <Button onClick={send} disabled={sending}>
+                {sending ? "Sending…" : "Send notification"}
+              </Button>
             </div>
           </div>
         </Card>
@@ -302,7 +362,9 @@ export function ComposeNotification() {
           <div className="kv">
             <strong>✓ In-app dashboard notice</strong>
             <strong>✓ Email backup</strong>
-            <span className="muted small">Recipients: 38 agents</span>
+            <span className="muted small">
+              Recipients: {agents.data ? `${recipientCount} ${recipientCount === 1 ? "agent" : "agents"}` : "…"}
+            </span>
           </div>
         </Card>
       </div>

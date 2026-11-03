@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api/index.js";
+import { ApiError } from "../../api/client.js";
 import useAsync from "../../hooks/useAsync.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -58,7 +59,7 @@ export function EditProfile() {
     const next = {};
     if (!values.name.trim()) next.name = "Enter your full name.";
     if (!isEmail(values.email)) next.email = "Enter a valid email address.";
-    // The sample phone number is masked, so only check it once it has been changed.
+    // The saved number is in +234 form, so only check it once it has been changed.
     if (values.phone !== data.phone && !isNigerianPhone(values.phone)) {
       next.phone = "Use a Nigerian mobile number, e.g. 0803 123 4567.";
     }
@@ -119,16 +120,37 @@ export function Settings() {
   );
 }
 
-export function ChangePassword({ backTo = "/agent/settings" }) {
-  const navigate = useNavigate();
+// The backend's field names for each box; non_field_errors holds its password-policy messages.
+const PASSWORD_ERROR_FIELDS = { oldPassword: "current", newPassword1: "next", non_field_errors: "next", newPassword2: "confirm" };
+
+function passwordErrors(err) {
+  const data = err instanceof ApiError && err.status === 400 ? err.data : null;
+  const out = {};
+  if (data && typeof data === "object") {
+    Object.entries(PASSWORD_ERROR_FIELDS).forEach(([apiKey, formKey]) => {
+      const value = data[apiKey];
+      if (value && !out[formKey]) out[formKey] = Array.isArray(value) ? String(value[0]) : String(value);
+    });
+  }
+  if (Object.keys(out).length === 0) {
+    out.form = err instanceof ApiError && err.status === 0
+      ? "We could not reach GrowLine. Check your internet connection and try again."
+      : "The password could not be changed. Please try again.";
+  }
+  return out;
+}
+
+export function ChangePassword({ backTo = "/agent/settings", bar = "Agent" }) {
   const [form, setForm] = useState({ current: "", next: "", confirm: "" });
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
   const set = (key) => (event) => {
     setForm({ ...form, [key]: event.target.value });
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
     const next = {};
     if (!form.current) next.current = "Enter your current password.";
@@ -136,12 +158,30 @@ export function ChangePassword({ backTo = "/agent/settings" }) {
     else if (form.next === form.current) next.next = "Choose a password different from the current one.";
     if (form.next !== form.confirm) next.confirm = "The two new passwords do not match.";
     setErrors(next);
-    if (Object.keys(next).length === 0) navigate(backTo);
+    if (Object.keys(next).length > 0) return;
+
+    setSaving(true);
+    setDone(false);
+    try {
+      await api.changePassword({ oldPassword: form.current, newPassword1: form.next, newPassword2: form.confirm });
+      setForm({ current: "", next: "", confirm: "" });
+      setDone(true);
+    } catch (err) {
+      setErrors(passwordErrors(err));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div className="stack">
-      <PageHeader bar="Agent" title="Change password" subtitle="Keep your GrowLine account secure" />
+      <PageHeader bar={bar} title="Change password" subtitle="Keep your GrowLine account secure" />
+      {done ? (
+        <p className="notice notice-success">
+          Your password has been changed. <Link to={backTo}>Back to settings</Link>
+        </p>
+      ) : null}
+      {errors.form ? <p className="notice notice-danger">{errors.form}</p> : null}
       <Card title="Update password">
         <form className="stack" onSubmit={submit}>
           <div className="form-grid">
@@ -150,7 +190,9 @@ export function ChangePassword({ backTo = "/agent/settings" }) {
             <FormField label="Confirm new password" type="password" value={form.confirm} onChange={set("confirm")} error={errors.confirm} />
           </div>
           <div className="form-actions">
-            <Button type="submit">Update password</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Updating…" : "Update password"}
+            </Button>
           </div>
         </form>
       </Card>

@@ -54,10 +54,10 @@ export const agentAdvisories = [
 // Daily Feedback: advisories fetched in the last 24 hours.
 // Feedback status is one of: Not collected, Accurate, Inaccurate.
 export const agentDailyFeedback = [
-  { id: "ADV-1", farm: "North Plot", farmId: "FARM-201", directive: "Safe to spray", fetched: "Today, 10:20 AM", feedback: "Not collected" },
-  { id: "ADV-2", farm: "Green Valley", farmId: "FARM-202", directive: "Do not spray", fetched: "Today, 9:45 AM", feedback: "Accurate" },
-  { id: "ADV-3", farm: "East Field", farmId: "FARM-203", directive: "Spray with caution", fetched: "Today, 6:30 AM", feedback: "Inaccurate" },
-  { id: "ADV-4", farm: "River Bend", farmId: "FARM-204", directive: "Safe to spray", fetched: "Yesterday, 5:10 PM", feedback: "Not collected" },
+  { id: 1, farm: "North Plot", farmId: "FARM-201", directive: "Safe to spray", fetched: "Today, 10:20 AM", feedback: "not_collected" },
+  { id: 2, farm: "Green Valley", farmId: "FARM-202", directive: "Do not spray", fetched: "Today, 9:45 AM", feedback: "accurate" },
+  { id: 3, farm: "East Field", farmId: "FARM-203", directive: "Spray with caution", fetched: "Today, 6:30 AM", feedback: "in_accurate" },
+  { id: 4, farm: "River Bend", farmId: "FARM-204", directive: "Safe to spray", fetched: "Yesterday, 5:10 PM", feedback: "not_collected" },
 ];
 
 // Only spray advisories are sent by SMS. One row per SMS sent in the last 24 hours.
@@ -70,8 +70,8 @@ export const agentSmsMessages = [
 ];
 
 export const agentNotifications = [
-  { id: "N-1", title: "Updated spray guidance", when: "Today", from: "Super Admin", body: "Please review the latest advisory guidance before sending SMS." },
-  { id: "N-2", title: "Farm registration reminder", when: "Yesterday", from: "Super Admin", body: "Ensure each farm has its own unique ID and GPS coordinates." },
+  { id: 2, title: "Updated spray guidance", when: "24 Oct, 14:12", read: false, body: "Please review the latest advisory guidance before sending SMS." },
+  { id: 1, title: "Farm registration reminder", when: "23 Oct, 10:15", read: true, body: "Ensure each farm has its own unique ID and GPS coordinates." },
 ];
 
 
@@ -104,12 +104,13 @@ export const complaintStore = [
 export const agentProfile = {
   name: "Amina Yusuf",
   email: "amina@example.com",
-  phone: "0803 *** 1190",
+  phone: "+2348031231190",
   agentId: "AGT-0042",
   assignedFarmers: 94,
   registeredFarms: 136,
   status: "Active",
-  location: "Oyo North",
+  location: "Oyo",
+  memberSince: "24 Oct 2026",
 };
 
 /* -------------------------------- Super admin -------------------------------- */

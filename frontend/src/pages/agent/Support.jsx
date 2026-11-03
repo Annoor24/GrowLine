@@ -15,15 +15,46 @@ import StatusPill from "../../components/StatusPill.jsx";
 
 export function Notifications() {
   const { data, loading, error, reload } = useAsync(api.agentNotifications);
+  const [readIds, setReadIds] = useState([]);
+  const [problem, setProblem] = useState("");
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
+
+  async function markRead(id) {
+    setProblem("");
+    try {
+      await api.agentMarkNotificationRead(id);
+      setReadIds((ids) => [...ids, id]);
+    } catch {
+      setProblem("The notification could not be marked as read. Please try again.");
+    }
+  }
+
   return (
     <div className="stack">
       <PageHeader bar="Agent" title="Notifications" subtitle="Messages from GrowLine Super Admin" />
-      {data.map((item) => (
-        <Card key={item.id} title={item.title} subtitle={`${item.when} • From ${item.from}`}>
-          <p>{item.body}</p>
-        </Card>
-      ))}
+      {problem ? <p className="notice notice-danger">{problem}</p> : null}
+      {data.length === 0 ? <p className="muted">You have no notifications.</p> : null}
+      {data.map((item) => {
+        const read = item.read || readIds.includes(item.id);
+        return (
+          <Card
+            key={item.id}
+            title={item.title}
+            subtitle={item.when}
+            actions={
+              read ? (
+                <StatusPill tone="neutral">Read</StatusPill>
+              ) : (
+                <Button variant="soft" onClick={() => markRead(item.id)}>
+                  Mark as read
+                </Button>
+              )
+            }
+          >
+            <p>{item.body}</p>
+          </Card>
+        );
+      })}
     </div>
   );
 }
