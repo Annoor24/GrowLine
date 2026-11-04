@@ -248,17 +248,8 @@ export function SmsHistory() {
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
   const columns = [
     { key: "message", label: "Message" },
-    {
-      key: "farm",
-      label: "Farm / farmer",
-      render: (row) => (
-        <span>
-          {row.farm} • {row.farmId}
-          <div className="small muted">{row.farmer}</div>
-        </span>
-      ),
-    },
-    { key: "sentAt", label: "Sent" },
+    { key: "sentAt", label: "Date" },
+    { key: "recipient", label: "Recipient" },
     { key: "status", label: "Status", render: (row) => <StatusPill>{row.status}</StatusPill> },
     {
       key: "action",
@@ -283,10 +274,9 @@ export function SmsHistory() {
 // SMS details: the advisory in one SMS and its delivery status.
 export function SmsDetails() {
   const { id } = useParams();
-  const { data, loading, error, reload } = useAsync(api.agentSmsMessages);
-  if (loading || !data) return <Loading error={error} onRetry={reload} />;
-  const message = data.find((item) => item.id === id);
-  if (!message) return <p className="notice notice-warning">Message not found.</p>;
+  const { data: message, loading, error, reload } = useAsync(() => api.agentSmsDetail(id), [id]);
+  if (error instanceof ApiError && error.status === 404) return <p className="notice notice-warning">Message not found.</p>;
+  if (loading || !message) return <Loading error={error} onRetry={reload} />;
   return (
     <div className="stack">
       <PageHeader bar="Agent" title="SMS details" subtitle="The advisory sent in this SMS and its status" />
@@ -295,7 +285,7 @@ export function SmsDetails() {
           ‹ Back to SMS list
         </Button>
       </div>
-      <Card title={message.message} subtitle={`${message.sentLong} • ${message.farm} (${message.farmId}) • ${message.farmer}`}>
+      <Card title={message.message} subtitle={`${message.sentLong} • ${message.recipient}`}>
         <div className="stack">
           <div>
             <StatusPill>{message.status}</StatusPill>
@@ -304,16 +294,18 @@ export function SmsDetails() {
             <div className="small muted">Message</div>
             <p>{message.text}</p>
           </div>
-          <div className="row" style={{ gap: 32 }}>
-            <div>
-              <div className="small muted">Directive</div>
-              <strong>{message.directive}</strong>
+          {message.directive || message.rating ? (
+            <div className="row" style={{ gap: 32 }}>
+              <div>
+                <div className="small muted">Directive</div>
+                <strong>{message.directive}</strong>
+              </div>
+              <div>
+                <div className="small muted">Rating</div>
+                <StatusPill tone={ratingTone(message.rating)}>{message.rating}</StatusPill>
+              </div>
             </div>
-            <div>
-              <div className="small muted">Rating</div>
-              <StatusPill tone={ratingTone(message.rating)}>{message.rating}</StatusPill>
-            </div>
-          </div>
+          ) : null}
         </div>
       </Card>
     </div>

@@ -74,13 +74,65 @@ export const agentFarmerDetail = (f) => ({
 const CONFIDENCE_LABELS = { HIGH: "High", MODERATE: "Moderate", LOWER: "Low" };
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
+// SMS status comes as the gateway sent it; the design shows Delivered, Failed, Submitted or Pending.
+const GATEWAY_LABELS = {
+  delivered: "Delivered",
+  success: "Delivered",
+  failed: "Failed",
+  undelivered: "Failed",
+  rejected: "Failed",
+  queued: "Submitted",
+  accepted: "Submitted",
+  sending: "Submitted",
+  submitted: "Submitted",
+  buffered: "Submitted",
+  sent: "Submitted",
+  pending: "Pending",
+  expired: "Expired",
+};
+export const gatewayLabel = (raw) => (raw ? GATEWAY_LABELS[String(raw).toLowerCase()] || titleCase(raw) : "—");
+
+// Agent: GET /agent/sms/history/ rows and GET /agent/sms/<id>/. Rows are one SMS to one farmer.
+export const smsRow = (s) => ({
+  id: s.id,
+  message: s.title || "Spray advisory",
+  recipient: s.recipient || "—",
+  sentAt: formatWhen(s.created_at),
+  sentLong: formatLong(s.created_at),
+  status: gatewayLabel(s.status),
+  text: s.message || "",
+});
+
+// Agent: POST /agent/check/farmer-phone/. "exists" is false when the number is free to register.
+export const farmerPhoneCheck = (c) => ({
+  exists: Boolean(c.exists),
+  canAddFarm: Boolean(c.can_add_farm),
+  canRequestAccess: Boolean(c.can_request_access),
+  currentAgentCode: c.current_agent_code || "—",
+  farmer: c.farmer
+    ? {
+        name: c.farmer.name,
+        code: c.farmer.code,
+        phone: c.farmer.phone || "",
+        farmsCount: c.farmer.farms_count ?? 0,
+        agentCode: c.farmer.assigned_agent_code || "—",
+        farms: (c.farmer.farms || []).map((farm) => ({
+          code: farm.code,
+          name: farm.name,
+          area: typeof farm.area_hectares === "number" ? `${farm.area_hectares.toFixed(2)} ha` : "—",
+          gpsStatus: titleCase(farm.gps_status),
+        })),
+      }
+    : null,
+});
+
 // Agent: GET /agent/advisories/activity/ rows (also the dashboard's recent activity).
 export const activityRow = (a, index) => ({
   id: `${a.farm_id}-${a.sent_at}-${index}`,
   farmer: a.farmer || "—",
   farmId: a.farm_id,
   rating: a.risk_display || "—",
-  sms: a.sms_status ? titleCase(a.sms_status) : "—",
+  sms: gatewayLabel(a.sms_status),
   api: apiLabel(a.weather_api),
   sentAt: formatWhen(a.sent_at),
 });
@@ -236,6 +288,16 @@ export function formatWhen(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+// "13 October 2026, 10:42"
+export function formatLong(iso) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  const day = date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const time = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return `${day}, ${time}`;
 }
 
 export function formatDate(iso) {

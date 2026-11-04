@@ -21,6 +21,8 @@ const CONNECTED_PAGES = [
   /^\/agent\/?$/,
   /^\/agent\/advisory\/farm$/,
   /^\/agent\/alerts$/,
+  /^\/agent\/sms(\/[^/]+)?$/,
+  /^\/agent\/farmers\/existing$/,
   /^\/(agent|admin)\/profile(\/edit)?$/,
   /^\/(agent|admin)\/settings\/password$/,
   /^\/admin\/notifications(\/new)?$/,

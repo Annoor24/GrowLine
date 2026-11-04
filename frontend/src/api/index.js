@@ -6,6 +6,8 @@ import {
   advisoryFarmOption,
   agentDashboard,
   farmAdvisoryResult,
+  farmerPhoneCheck,
+  smsRow,
   userProfile,
   agentDetail,
   agentFarmerDetail,
@@ -169,6 +171,11 @@ const sampleReply = (code, message, role) => {
 // Responses are either wrapped as { message, data } or bare, depending on the endpoint.
 const unwrap = (res) => (res && "data" in res && "message" in res ? res.data : res);
 
+const sampleSmsRow = (sms) => ({
+  ...sms,
+  recipient: data.agentFarmers.find((farmer) => farmer.name === sms.farmer)?.id || "—",
+});
+
 const sampleFarmerTiles = [
   { label: "Farmers", value: "1,200", note: "Unique farmer profiles" },
   { label: "Farms", value: "1,680", note: "Separate farm records" },
@@ -315,6 +322,32 @@ export const api = {
     async () => unwrap(await request("/agent/farm-list/")).map(agentFarmRow),
     () => data.agentFarms.map((f) => ({ ...f, code: f.id, stage: "Vegetative" })),
   ),
+  // Run before registering. Sample: 0803 555 0142 is the agent's own farmer, 0803 555 0143 another agent's.
+  agentCheckFarmerPhone: live(
+    async (phone) => farmerPhoneCheck(unwrap(await request("/agent/check/farmer-phone/", { method: "POST", body: { phone } }))),
+    (phone) => {
+      if (phone.endsWith("8035550143")) {
+        return farmerPhoneCheck({ exists: true, can_request_access: true, current_agent_code: "AGT-0042", farmer: { name: "Bisi Ojo", code: "FRM-2040" } });
+      }
+      if (!phone.endsWith("8035550142")) return farmerPhoneCheck({ exists: false, farmer: null });
+      return farmerPhoneCheck({
+        exists: true,
+        can_add_farm: true,
+        current_agent_code: "AGT-0042",
+        farmer: {
+          name: "Musa Ibrahim",
+          code: "FRM-1021",
+          phone,
+          farms_count: 2,
+          assigned_agent_code: "AGT-0042",
+          farms: [
+            { code: "FARM-201", name: "North Plot", area_hectares: 1.2, gps_status: "verified" },
+            { code: "FARM-202", name: "River Plot", area_hectares: 0.7, gps_status: "pending" },
+          ],
+        },
+      });
+    },
+  ),
   // body: { full_name, phone_e164, state, lga, town_or_village, language, farms: [{ estimated_footprint }] }
   agentRegisterFarmer: live(
     async (body) => unwrap(await request("/agent/register/farmers/", { method: "POST", body })),
@@ -382,7 +415,19 @@ export const api = {
       dailyFeedbackRow(unwrap(await request(`/agent/advisories/${id}/feedback/`, { method: "PATCH", body: { feedback } }))),
     (id, feedback) => Object.assign(data.agentDailyFeedback.find((row) => row.id === id), { feedback }),
   ),
-  agentSmsMessages: sample(data.agentSmsMessages),
+  // ---------- Agent SMS history ----------
+  agentSmsMessages: live(
+    async () => unwrap(await request("/agent/sms/history/")).map(smsRow),
+    () => data.agentSmsMessages.map(sampleSmsRow),
+  ),
+  agentSmsDetail: live(
+    async (id) => smsRow(unwrap(await request(`/agent/sms/${encodeURIComponent(id)}/`))),
+    (id) => {
+      const found = data.agentSmsMessages.find((sms) => String(sms.id) === String(id));
+      if (!found) throw new ApiError(404, { detail: "Not found." });
+      return sampleSmsRow(found);
+    },
+  ),
   // ---------- Agent notifications ----------
   agentNotifications: live(
     async () => unwrap(await request("/agent/notifications/")).map(notificationRow),

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/index.js";
 import { ApiError } from "../../api/client.js";
 import useAsync from "../../hooks/useAsync.js";
@@ -142,6 +142,12 @@ export function RegisterFarmer() {
     if (!validate(addFarm)) return;
     setSaving(true);
     try {
+      // Look the number up first so a registered farmer is never created twice.
+      const check = await api.agentCheckFarmerPhone(toE164(form.phone));
+      if (check.exists) {
+        navigate("/agent/farmers/existing", { state: { phone: toE164(form.phone), check } });
+        return;
+      }
       await api.agentRegisterFarmer({
         full_name: form.name.trim(),
         phone_e164: toE164(form.phone),
@@ -155,6 +161,7 @@ export function RegisterFarmer() {
     } catch (err) {
       const found = firstErrors(err, {
         full_name: "name",
+        phone: "phone",
         phone_e164: "phone",
         state: "state",
         lga: "lga",
@@ -248,43 +255,79 @@ export function RegisterFarmer() {
   );
 }
 
-// MOCK content from the design: the record that matches the duplicate phone number.
+// The result of the phone check on Register farmer, passed in the page's navigation state.
 export function ExistingFarmerFound() {
   const navigate = useNavigate();
+  const { state } = useLocation();
+  if (!state?.check?.farmer) return <Navigate to="/agent/farmers/new" replace />;
+  const { phone, check } = state;
+  const { farmer } = check;
+
+  // Another agent's farmer: the backend only shares the name and code.
+  if (!check.canAddFarm) {
+    return (
+      <div className="stack">
+        <PageHeader bar="Agent" title="Existing farmer found" subtitle="This phone number is registered under another extension agent." />
+        <p className="notice notice-warning">
+          <strong>Existing record detected.</strong>
+          <br />
+          {phone} belongs to {farmer.name} ({farmer.code}). Do not create a duplicate farmer.
+        </p>
+        <Card title="Next step">
+          <p className="muted">Contact the Super Admin to get access to this farmer.</p>
+          <div className="form-actions">
+            <Button as={Link} to="/agent/complaints/new">
+              Contact Super Admin
+            </Button>
+            <Button variant="secondary" onClick={() => navigate("/agent/farmers")}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="stack">
       <PageHeader bar="Agent" title="Existing farmer found" subtitle="This phone number is already registered. Add a farm to the existing profile." />
       <p className="notice notice-warning">
         <strong>Existing record detected.</strong>
         <br />
-        +234 803 555 0142 belongs to Amina Bello (FRM-0104). Do not create a duplicate farmer.
+        {farmer.phone || phone} belongs to {farmer.name} ({farmer.code}). Do not create a duplicate farmer.
       </p>
       <Card title="Farmer profile">
         <div className="kv">
-          <strong>Amina Bello • FRM-0104</strong>
-          <span>Phone: +234 803 555 0142 | Tomato farmer | Registered farms: 2</span>
-          <span>Assigned agent: AGT-0042 | Current agent: AGT-0042</span>
+          <strong>
+            {farmer.name} • {farmer.code}
+          </strong>
+          <span>
+            Phone: {farmer.phone || phone} | Tomato farmer | Registered farms: {farmer.farmsCount}
+          </span>
+          <span>
+            Assigned agent: {farmer.agentCode} | Current agent: {check.currentAgentCode}
+          </span>
         </div>
       </Card>
       <Card title="Existing farms">
         <div className="kv">
-          <span>FARM-0201 • North Field • 1.2 ha • GPS verified</span>
-          <span>FARM-0202 • Riverside Plot • 0.7 ha • GPS pending</span>
+          {farmer.farms.map((farm) => (
+            <span key={farm.code}>
+              {farm.code} • {farm.name} • {farm.area} • GPS {farm.gpsStatus.toLowerCase()}
+            </span>
+          ))}
           <span className="muted small">A new farm will receive its own Farm ID, coordinates and alert history.</span>
         </div>
       </Card>
       <Card title="Next step">
-        <p className="muted">Add a new farm under FRM-0104. Farmer details will be prefilled and locked.</p>
+        <p className="muted">Add a new farm under {farmer.code}. Farmer details will be prefilled and locked.</p>
         <div className="form-actions">
-          <Button onClick={() => navigate("/agent/farmers/FRM-0104/farms/new")}>+ Add New Farm</Button>
+          <Button onClick={() => navigate(`/agent/farmers/${farmer.code}/farms/new`)}>+ Add New Farm</Button>
           <Button variant="secondary" onClick={() => navigate("/agent/farmers")}>
             Cancel
           </Button>
         </div>
       </Card>
-      <p className="hint">
-        Access rule: if the farmer belongs to another agent, show Request Access instead of Add New Farm.
-      </p>
     </div>
   );
 }
