@@ -3,6 +3,11 @@ import { ApiError, fetchAllPages, request, USE_MOCKS } from "./client.js";
 import { readSession } from "./session.js";
 import {
   activityRow,
+  adminOverview,
+  adminReports,
+  smsAlertDetail,
+  smsAlertRow,
+  smsStatTiles,
   advisoryFarmOption,
   agentDashboard,
   farmAdvisoryResult,
@@ -171,6 +176,39 @@ const sampleReply = (code, message, role) => {
 // Responses are either wrapped as { message, data } or bare, depending on the endpoint.
 const unwrap = (res) => (res && "data" in res && "message" in res ? res.data : res);
 
+// The log returns ALT-0278 but the detail endpoint only accepts ALT-<date>-0278. It reads the number
+// at the end and does not check the date, so short IDs get a placeholder date.
+const fullAlertId = (id) => String(id).replace(/^ALT-(\d+)$/i, "ALT-00000000-$1");
+
+const sampleSmsTiles = [
+  { label: "Generated", value: "1,000", note: "All providers" },
+  { label: "Delivered", value: "940", note: "94.0%" },
+  { label: "Failed", value: "35", note: "3.5%" },
+  { label: "Queued", value: "25", note: "2.5%" },
+];
+
+function sampleAlertDetail(id) {
+  const alert = data.adminAlerts.find((a) => a.id === id);
+  if (!alert) throw new ApiError(404, { detail: "Not found." });
+  const extra = data.adminAlertDetail.id === id ? data.adminAlertDetail : {};
+  return {
+    id,
+    api: alert.api,
+    forecastEventId: extra.forecastEventId || "WX-00100",
+    farmerCode: alert.farmerId,
+    farmerName: "",
+    farmCode: alert.farmId,
+    farmName: "",
+    smsId: extra.smsId || "SMS-04000",
+    gatewayMessageId: extra.gatewayMessageId || "GW-99000",
+    sentAt: alert.sentAt,
+    status: alert.delivery,
+    failureReason: extra.failureReason || "",
+    attempts: extra.failureReason ? 2 : 1,
+    recovery: extra.recovery || "Retry by backend policy only · No retry scheduled",
+  };
+}
+
 const sampleSmsRow = (sms) => ({
   ...sms,
   recipient: data.agentFarmers.find((farmer) => farmer.name === sms.farmer)?.id || "—",
@@ -242,16 +280,32 @@ export const api = {
   ),
 
   // ---------- Not connected yet (no backend endpoint): always sample data ----------
-  adminOverview: sample(data.adminOverview),
+  adminOverview: live(async () => adminOverview(await request("/superadmin/overview/")), () => data.adminOverview),
   adminFarmerAssignments: sample(data.adminFarmerAssignments),
   // GET /user/ has no email or admin ID, so the email comes from the login.
   adminProfile: live(
     async () => ({ ...userProfile(await request("/user/")), email: readSession()?.email || "", adminId: "" }),
     () => data.adminProfile,
   ),
-  adminAlerts: sample(data.adminAlerts),
-  adminAlertDetail: sample(data.adminAlertDetail),
-  adminReports: sample(data.adminReports),
+  // SMS management is per day (date: YYYY-MM-DD; the backend defaults to today).
+  adminSmsStats: live(
+    async (date) => smsStatTiles(unwrap(await request(`/superadmin/sms/stats/?${new URLSearchParams(date ? { date } : {})}`))),
+    () => sampleSmsTiles,
+  ),
+  adminAlerts: live(
+    async ({ date, page = 1 } = {}) => {
+      const params = new URLSearchParams({ page: String(page) });
+      if (date) params.set("date", date);
+      const log = unwrap(await request(`/superadmin/sms/alerts/?${params}`));
+      return { count: log.count, page: log.page, totalPages: log.total_pages, rows: log.results.map(smsAlertRow) };
+    },
+    () => ({ count: data.adminAlerts.length, page: 1, totalPages: 1, rows: data.adminAlerts }),
+  ),
+  adminAlertDetail: live(
+    async (id) => smsAlertDetail(unwrap(await request(`/superadmin/sms/alerts/${encodeURIComponent(fullAlertId(id))}/`))),
+    sampleAlertDetail,
+  ),
+  adminReports: live(async () => adminReports(await request("/superadmin/reports/")), () => data.adminReports),
   adminNotifications: live(
     async () => {
       const { rows } = await fetchAllPages("/superadmin/notifications/");

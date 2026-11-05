@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { api } from "../../api/index.js";
 import useAsync from "../../hooks/useAsync.js";
 import Card from "../../components/Card.jsx";
@@ -8,6 +9,7 @@ import StatCard from "../../components/StatCard.jsx";
 import StatusPill from "../../components/StatusPill.jsx";
 
 export default function AdminOverview() {
+  const navigate = useNavigate();
   const { data, loading, error, reload } = useAsync(api.adminOverview);
   if (loading || !data) return <Loading error={error} onRetry={reload} />;
 
@@ -44,10 +46,11 @@ export default function AdminOverview() {
 
       <div className="grid grid-main-side">
         <Card title="Weather API pilot performance" subtitle="Comparable groups • delivery is not forecast accuracy">
-          <DataTable columns={apiColumns} rows={data.apiPerformance} />
+          <DataTable columns={apiColumns} rows={data.apiPerformance} empty="No weather API data yet." />
         </Card>
         <Card title="Requires attention" subtitle="Operational issues to investigate">
           <div className="stack">
+            {data.attention.length === 0 ? <span className="muted">Nothing needs attention right now.</span> : null}
             {data.attention.map((item) => (
               <div key={item.id} className="kv">
                 <div>
@@ -62,7 +65,12 @@ export default function AdminOverview() {
 
       <div className="grid grid-main-side">
         <Card title="Recent system activity" subtitle="Traceable events with farmer, farm and provider identifiers">
-          <DataTable columns={activityColumns} rows={data.activity} />
+          <DataTable
+            columns={activityColumns}
+            rows={data.activity}
+            onRowClick={(row) => row.farmerId && navigate(`/admin/farmers/${row.farmerId}`)}
+            empty="No recent activity."
+          />
         </Card>
         <Card title="Pilot decision readiness" subtitle="Use multiple signals, not SMS delivery alone">
           <div className="kv">
@@ -76,8 +84,13 @@ export default function AdminOverview() {
             </div>
             <div>
               <div className="small muted">Decision status</div>
-              <StatusPill tone="warning">{data.readiness.decision}</StatusPill>
+              <StatusPill tone={data.readiness.tone || "warning"}>{data.readiness.decision}</StatusPill>
             </div>
+            {(data.readiness.reasons || []).map((reason) => (
+              <span key={reason} className="small">
+                {reason}
+              </span>
+            ))}
             <span className="muted small">{data.readiness.note}</span>
           </div>
         </Card>

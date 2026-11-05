@@ -6,6 +6,9 @@ import Icon from "../components/Icon.jsx";
 
 // Pages that read from the real backend. Everything else still shows sample data.
 const CONNECTED_PAGES = [
+  /^\/admin\/?$/,
+  /^\/admin\/sms(\/[^/]+)?$/,
+  /^\/admin\/reports$/,
   /^\/admin\/agents$/,
   /^\/admin\/agents\/(invitations|new)$/,
   /^\/admin\/agents\/\d+$/,

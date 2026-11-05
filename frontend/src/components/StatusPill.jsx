@@ -11,6 +11,8 @@ const TONES = {
     "safe to spray",
     "connected",
     "onboarded",
+    "recorded",
+    "operational",
   ],
   warning: [
     "pending",

@@ -1,26 +1,25 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/index.js";
+import { ApiError } from "../../api/client.js";
 import useAsync from "../../hooks/useAsync.js";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
 import DataTable from "../../components/DataTable.jsx";
+import FormField from "../../components/FormField.jsx";
 import Loading from "../../components/Loading.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import StatCard from "../../components/StatCard.jsx";
 import StatusPill from "../../components/StatusPill.jsx";
 
-// MOCK summary tiles from the design.
-const SMS_TILES = [
-  { label: "Generated", value: "1,000", note: "All alerts" },
-  { label: "Delivered", value: "940", note: "94.0%" },
-  { label: "Failed", value: "35", note: "3.5%" },
-  { label: "Queued", value: "25", note: "2.5%" },
-];
+const today = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD in local time
 
 export function SmsMonitoring() {
   const navigate = useNavigate();
-  const { data, loading, error, reload } = useAsync(api.adminAlerts);
-  if (loading || !data) return <Loading error={error} onRetry={reload} />;
+  const [date, setDate] = useState(today);
+  const [page, setPage] = useState(1);
+  const stats = useAsync(() => api.adminSmsStats(date), [date]);
+  const log = useAsync(() => api.adminAlerts({ date, page }), [date, page]);
   const columns = [
     { key: "id", label: "Alert ID" },
     { key: "farm", label: "Farmer / Farm", render: (row) => `${row.farmerId} / ${row.farmId}` },
@@ -32,18 +31,55 @@ export function SmsMonitoring() {
   return (
     <div className="stack">
       <PageHeader title="SMS management" subtitle="Separate delivery facts from forecast performance" />
-      <div className="grid grid-4">
-        {SMS_TILES.map((tile) => (
-          <StatCard key={tile.label} {...tile} />
-        ))}
-      </div>
-      <Card title="Alert delivery log" subtitle="Traceable by farmer, farm, API, gateway status and feedback">
-        <DataTable
-          columns={columns}
-          rows={data}
-          onRowClick={(row) => navigate(`/admin/sms/${row.id}`)}
-          empty="No alerts have been generated yet."
+      <div style={{ maxWidth: 220 }}>
+        <FormField
+          label="Date"
+          type="date"
+          value={date}
+          max={today()}
+          onChange={(e) => {
+            setDate(e.target.value || today());
+            setPage(1);
+          }}
         />
+      </div>
+      {stats.data ? (
+        <div className="grid grid-4">
+          {stats.data.map((tile) => (
+            <StatCard key={tile.label} {...tile} />
+          ))}
+        </div>
+      ) : (
+        <Loading error={stats.error} onRetry={stats.reload} />
+      )}
+      <Card title="Alert delivery log" subtitle="Traceable by farmer, farm, API, gateway status and feedback">
+        {log.data ? (
+          <div className="stack">
+            <DataTable
+              columns={columns}
+              rows={log.data.rows}
+              onRowClick={(row) => navigate(`/admin/sms/${row.id}`)}
+              empty="No alerts were sent on this date."
+            />
+            {log.data.totalPages > 1 ? (
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span className="muted small">
+                  Page {log.data.page} of {log.data.totalPages} • {log.data.count} alerts
+                </span>
+                <div className="row">
+                  <Button variant="secondary" disabled={page <= 1 || log.loading} onClick={() => setPage(page - 1)}>
+                    Previous
+                  </Button>
+                  <Button variant="secondary" disabled={page >= log.data.totalPages || log.loading} onClick={() => setPage(page + 1)}>
+                    Next
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <Loading error={log.error} onRetry={log.reload} />
+        )}
       </Card>
     </div>
   );
@@ -51,15 +87,21 @@ export function SmsMonitoring() {
 
 export function AlertDetail() {
   const { id } = useParams();
-  const { data, loading, error, reload } = useAsync(
-    () => Promise.all([api.adminAlerts(), api.adminAlertDetail()]),
-    [id],
-  );
-  if (loading || !data) return <Loading error={error} onRetry={reload} />;
-  const [alerts, extra] = data;
-  const alert = alerts.find((item) => item.id === id);
-  if (!alert) return <p className="notice notice-warning">Alert not found.</p>;
-  const detail = extra.id === alert.id ? extra : null;
+  const navigate = useNavigate();
+  const { data: alert, loading, error, reload } = useAsync(() => api.adminAlertDetail(id), [id]);
+  if (error instanceof ApiError && error.status === 404) return <p className="notice notice-warning">Alert not found.</p>;
+  if (loading || !alert) return <Loading error={error} onRetry={reload} />;
+
+  // The alert only has the farmer's code, but the farmer page opens by ID, so look it up in the list.
+  async function openFarmer() {
+    try {
+      const farmers = await api.adminFarmers();
+      const farmer = farmers.find((row) => row.code === alert.farmerCode);
+      navigate(farmer ? `/admin/farmers/${farmer.id}` : "/admin/farmers");
+    } catch {
+      navigate("/admin/farmers");
+    }
+  }
 
   return (
     <div className="stack">
@@ -67,38 +109,42 @@ export function AlertDetail() {
       <Card title={`Alert ${alert.id}`}>
         <div className="kv">
           <span>
-            Weather {alert.api}
-            {detail ? ` · Forecast event ${detail.forecastEventId}` : ""} · Farmer {alert.farmerId}
+            Weather {alert.api} · Forecast event {alert.forecastEventId} · Farmer {alert.farmerCode}
+            {alert.farmerName ? ` (${alert.farmerName})` : ""}
           </span>
           <span>
-            Farm {alert.farmId}
-            {detail ? ` · SMS ${detail.smsId} · Gateway message ID ${detail.gatewayMessageId}` : ""}
+            Farm {alert.farmCode}
+            {alert.farmName ? ` (${alert.farmName})` : ""}
+            {alert.smsId ? ` · SMS ${alert.smsId} · Gateway message ID ${alert.gatewayMessageId}` : ""}
           </span>
           <div>
-            Status: <StatusPill>{alert.delivery}</StatusPill>
-            {detail ? <span className="error-text"> {detail.failureReason}</span> : null}
+            Status: <StatusPill>{alert.status}</StatusPill>
+            {alert.failureReason ? <span className="error-text"> {alert.failureReason}</span> : null}
           </div>
-          <span className="muted small">Sent: {alert.sentAt}</span>
+          {alert.sentAt ? <span className="muted small">Sent: {alert.sentAt}</span> : null}
         </div>
       </Card>
-      {detail ? (
-        <Card title="Recovery">
-          <div className="kv">
-            <span className="notice notice-warning">{detail.recovery}</span>
-            <span>
-              <Link className="link-button" to={`/admin/farmers/${alert.farmerId}`}>
-                Open farmer
-              </Link>
-              {" | "}
-              <Link className="link-button" to="/admin/reports">
-                Open API comparison
-              </Link>
-            </span>
-          </div>
-        </Card>
-      ) : (
-        <p className="muted small">No further delivery detail in the sample data for this alert.</p>
-      )}
+      <Card title="Recovery">
+        <div className="kv">
+          {alert.recovery ? (
+            <>
+              <span className="notice notice-warning">{alert.recovery}</span>
+              <span className="muted small">Send attempts: {alert.attempts}</span>
+            </>
+          ) : (
+            <span className="muted">This advisory was not sent by SMS.</span>
+          )}
+          <span>
+            <button type="button" className="link-button" onClick={openFarmer}>
+              Open farmer
+            </button>
+            {" | "}
+            <Link className="link-button" to="/admin/reports">
+              Open API comparison
+            </Link>
+          </span>
+        </div>
+      </Card>
       <div>
         <Button variant="secondary" as={Link} to="/admin/sms">
           Back to SMS management
@@ -144,7 +190,7 @@ export function Reports() {
                 <div className="row" style={{ justifyContent: "space-between" }}>
                   <span>{item.label}</span>
                   <strong>
-                    {item.value} / {item.percent}%
+                    {item.value} / {item.percentLabel ?? `${item.percent}%`}
                   </strong>
                 </div>
                 <div className={`progress ${item.tone}`.trim()}>

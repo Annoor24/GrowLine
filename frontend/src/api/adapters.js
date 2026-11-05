@@ -347,6 +347,195 @@ export const invitationRow = (a) => ({
   action: INVITE_ACTIONS[String(a.invitation || "").toLowerCase()] || "—",
 });
 
+// ----- operations overview -----
+const OVERVIEW_ATTENTION_TONES = { error: "danger", warning: "warning" };
+const shortApi = (label) => String(label || "—").replace(/^API\s+/, "");
+// The backend sends null when there is nothing to divide by; that shows as empty, never 0%.
+const rate = (value, text) => (typeof value === "number" ? `${value.toFixed(1)}% ${text}` : "");
+const percent = (value) => (typeof value === "number" ? `${value}%` : "—");
+
+// "A, B and C operational"
+function operationalNote(labels = []) {
+  const names = labels.map(shortApi);
+  if (names.length === 0) return "None operational";
+  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
+  return `${list} operational`;
+}
+
+// Today's events show the time; older ones add the day.
+function activityTime(iso) {
+  const date = new Date(iso);
+  if (!iso || Number.isNaN(date.getTime())) return "—";
+  if (date.toDateString() !== new Date().toDateString()) return formatWhen(iso);
+  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+// Super admin: GET /superadmin/overview/, in the shape the Overview page uses.
+export function adminOverview(o) {
+  const c = o.cards || {};
+  const days = o.window_days ?? 7;
+  const decision = o.decision || {};
+  const sample = decision.feedback_sample || {};
+  return {
+    dateLabel: formatDate(o.as_of),
+    stats: [
+      { label: "Registered farmers", value: number(c.registered_farmers?.value), note: `+${c.registered_farmers?.new_in_window ?? 0} ${days === 7 ? "this week" : `in ${days} days`}`, tone: "good" },
+      { label: "Registered farms", value: number(c.registered_farms?.value), note: `${(c.registered_farms?.farms_per_farmer ?? 0).toFixed(1)} farms per farmer` },
+      { label: "Verified farm GPS", value: number(c.verified_farm_gps?.value), note: `${c.verified_farm_gps?.require_verification ?? 0} require verification` },
+      { label: "Active weather APIs", value: `${c.active_weather_apis?.active ?? 0} / ${c.active_weather_apis?.total ?? 0}`, note: operationalNote(c.active_weather_apis?.operational), tone: "good" },
+      { label: "SMS generated", value: number(c.sms_generated?.value), note: `Last ${days} days` },
+      { label: "SMS delivered", value: number(c.sms_delivered?.value), note: rate(c.sms_delivered?.delivery_rate_pct, "delivery rate"), tone: "good" },
+      { label: "SMS failed", value: number(c.sms_failed?.value), note: rate(c.sms_failed?.failed_rate_pct, "require review"), tone: "bad" },
+      { label: "Farmers feedback", value: number(c.farmer_feedback?.value), note: rate(c.farmer_feedback?.pct_of_delivered, "of delivered") },
+    ],
+    apiPerformance: (o.api_performance || []).map((a) => ({
+      id: a.api,
+      api: a.api_label,
+      farmers: a.farmers,
+      alerts: a.alerts,
+      delivered: a.delivered,
+      failed: a.failed,
+      pending: a.pending,
+      accuracy: percent(a.accuracy_pct),
+    })),
+    attention: (o.attention || []).map((a) => ({
+      id: `${a.kind}-${a.message}`,
+      label: a.badge,
+      tone: OVERVIEW_ATTENTION_TONES[a.severity] || "warning",
+      detail: a.message,
+    })),
+    activity: (o.recent_activity || []).map((a, index) => ({
+      id: `${a.event}-${a.time}-${index}`,
+      time: activityTime(a.time),
+      event: a.label,
+      record: a.record,
+      api: shortApi(a.api_label),
+      status: titleCase(a.status),
+      farmerId: a.farmer_uuid,
+    })),
+    readiness: {
+      accuracy: (decision.forecast_accuracy || []).map((a) => `${shortApi(a.api_label)}: ${percent(a.accuracy_pct)}`).join(" • ") || "—",
+      feedbackSample: `${sample.responses ?? 0} of ${sample.delivered ?? 0} delivered alerts`,
+      decision: decision.status === "sufficient" ? "Sufficient evidence" : "Insufficient evidence",
+      tone: decision.status === "sufficient" ? "success" : "warning",
+      reasons: decision.reasons || [],
+      note: decision.note || "",
+    },
+  };
+}
+
+// ----- SMS management -----
+// Super admin: GET /superadmin/sms/stats/ (the four cards).
+export const smsStatTiles = (s) => [
+  { label: "Generated", value: number(s.generated), note: "All providers" },
+  { label: "Delivered", value: number(s.delivered), note: `${(s.delivered_pct ?? 0).toFixed(1)}%` },
+  { label: "Failed", value: number(s.failed), note: `${(s.failed_pct ?? 0).toFixed(1)}%` },
+  { label: "Queued", value: number(s.queued), note: `${(s.queued_pct ?? 0).toFixed(1)}%` },
+];
+
+// Super admin: GET /superadmin/sms/alerts/ rows.
+export const smsAlertRow = (a) => ({
+  id: a.alert_id,
+  farmerId: a.farmer_code,
+  farmId: a.farm_code,
+  api: a.source ? apiLabel(a.source) : "—",
+  delivery: gatewayLabel(a.gateway_status),
+  feedback: a.feedback_display || "No response",
+  sentAt: formatWhen(a.sent_at),
+});
+
+// Super admin: GET /superadmin/sms/alerts/<alert_id>/. sms and recovery are null if it was never texted.
+export function smsAlertDetail(a) {
+  const recovery = a.recovery;
+  const reason = a.status?.failure_reason;
+  let recoveryText = "";
+  if (recovery) {
+    const next = recovery.retry_scheduled
+      ? `Next attempt scheduled ${formatWhen(recovery.next_attempt_at)}`
+      : recovery.needs_followup
+        ? "Needs extension agent follow-up"
+        : "No retry scheduled";
+    recoveryText = `Retry by backend policy only · ${next}`;
+  }
+  return {
+    id: a.alert_id,
+    api: a.weather_source ? apiLabel(a.weather_source) : "—",
+    forecastEventId: a.forecast_event?.code || "—",
+    farmerCode: a.farmer?.code || "—",
+    farmerName: a.farmer?.name || "",
+    farmCode: a.farm?.code || "—",
+    farmName: a.farm?.name || "",
+    smsId: a.sms?.code || "",
+    gatewayMessageId: a.sms?.gateway_message_id || "—",
+    sentAt: a.sms?.sent_at ? formatWhen(a.sms.sent_at) : "",
+    status: a.sms ? gatewayLabel(a.status?.gateway_status || a.status?.state) : "Not sent",
+    failureReason: reason?.message || "",
+    attempts: recovery?.attempts ?? 0,
+    recovery: recoveryText,
+  };
+}
+
+// ----- reports -----
+const REPORT_METHODOLOGY = [
+  "Assign farmers to balanced geographical cohorts.",
+  "Record API source on each forecast and SMS.",
+  "Collect structured farmer feedback per alert.",
+  "Compare with independent observed weather.",
+  "Track confidence, coverage and sample sizes.",
+  "Decide only when evidence is sufficient.",
+];
+const shortRate = (value, text) => (typeof value === "number" ? `${value}% ${text}` : "");
+const outcome = (label, row, tone) => ({
+  label,
+  value: number(row?.count ?? 0),
+  percent: row?.pct_of_generated ?? 0,
+  percentLabel: percent(row?.pct_of_generated),
+  tone,
+});
+
+// Super admin: GET /superadmin/reports/. top_provisional_api is null until there is feedback.
+export function adminReports(r) {
+  const c = r.cards || {};
+  const top = c.top_provisional_api;
+  const outcomes = r.delivery_outcomes || {};
+  return {
+    dateLabel: formatDate(r.as_of),
+    stats: [
+      {
+        label: "Pilot alerts",
+        value: number(c.pilot_alerts?.value),
+        note: (c.pilot_alerts?.by_api || []).map((a) => `${a.alerts} ${shortApi(a.api_label)}`).join(" / "),
+      },
+      { label: "Delivered", value: number(c.delivered?.value), note: shortRate(c.delivered?.pct_of_generated, "of generated") },
+      { label: "Feedback received", value: number(c.feedback_received?.value), note: shortRate(c.feedback_received?.response_rate_pct, "response rate") },
+      {
+        label: "Top provisional API",
+        value: top?.api_label || "—",
+        note: top ? `${percent(top.accuracy_pct)} reported accuracy${top.evidence_sufficient ? "" : " • limited feedback"}` : "Not enough feedback yet",
+      },
+    ],
+    providers: (r.provider_comparison || []).map((p) => ({
+      id: p.api,
+      provider: p.api_label,
+      assigned: p.farmers,
+      sent: p.alerts,
+      delivered: p.delivered,
+      failed: p.failed,
+      pending: p.pending,
+      feedback: p.feedback_count,
+      accuracy: percent(p.accuracy_pct),
+    })),
+    outcomes: [
+      outcome("Delivered", outcomes.delivered, ""),
+      outcome("Failed", outcomes.failed, "bad"),
+      outcome("Pending", outcomes.pending, "warn"),
+      // The design has three rows; expired only appears when there is something to report.
+      ...(outcomes.expired?.count ? [outcome("Expired", outcomes.expired, "bad")] : []),
+    ],
+    methodology: REPORT_METHODOLOGY,
+  };
+}
+
 // ----- farmers -----
 export const farmerRow = (f) => ({
   id: f.id,
