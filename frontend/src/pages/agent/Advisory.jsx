@@ -89,7 +89,7 @@ export function DailyFeedback() {
       <PageHeader bar="Agent" title="Daily Feedback" subtitle="Advisories fetched in the last 24 hours. Update the feedback status for each advisory." />
       <Card
         title="24-hour advisory window"
-        subtitle={`Showing ${data.length} advisories`}
+        subtitle={`Showing ${data.rows.length} ${data.rows.length === 1 ? "advisory" : "advisories"}${data.updatedAt ? ` • Updated ${data.updatedAt}` : ""}`}
         actions={
           <Button variant="soft" onClick={reload}>
             Refresh list
@@ -97,7 +97,7 @@ export function DailyFeedback() {
         }
       >
         {problem ? <p className="notice notice-danger">{problem}</p> : null}
-        <DataTable columns={columns} rows={data} empty="No advisories were fetched in the last 24 hours." />
+        <DataTable columns={columns} rows={data.rows} empty="No advisories were fetched in the last 24 hours." />
         <p className="hint" style={{ marginTop: 12 }}>
           Status options: Not collected • Accurate • Inaccurate
         </p>

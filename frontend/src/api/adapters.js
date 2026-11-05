@@ -232,6 +232,13 @@ export const notificationBatchRow = (n) => ({
 // Agent daily feedback: the API stores in_accurate; the page says Inaccurate.
 export const FEEDBACK_LABELS = { not_collected: "Not collected", accurate: "Accurate", in_accurate: "Inaccurate" };
 
+// "10:42 AM"
+export function formatClock(iso) {
+  const date = new Date(iso);
+  if (!iso || Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
 // "Today, 10:20 AM" / "Yesterday, 5:10 PM" / "30 Oct, 5:10 PM"
 export function formatFetched(iso) {
   const date = new Date(iso);

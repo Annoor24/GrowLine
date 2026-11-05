@@ -23,6 +23,7 @@ import {
   complaintRow,
   complaintThread,
   dailyFeedbackRow,
+  formatClock,
   followUpMessage,
   farmDetail,
   farmRow,
@@ -460,8 +461,11 @@ export const api = {
   ),
   // ---------- Agent daily feedback (advisories from the last 24 hours) ----------
   agentDailyFeedback: live(
-    async () => unwrap(await request("/agent/advisories/daily-feedback/")).results.map(dailyFeedbackRow),
-    () => data.agentDailyFeedback.map((row) => ({ ...row })),
+    async () => {
+      const list = unwrap(await request("/agent/advisories/daily-feedback/"));
+      return { rows: list.results.map(dailyFeedbackRow), updatedAt: formatClock(list.updated_at) };
+    },
+    () => ({ rows: data.agentDailyFeedback.map((row) => ({ ...row })), updatedAt: "10:42 AM" }),
   ),
   // feedback: not_collected | accurate | in_accurate. Returns the updated row.
   agentUpdateFeedback: live(
