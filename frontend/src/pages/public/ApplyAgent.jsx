@@ -41,6 +41,7 @@ const EMPTY = {
   extra: "",
   confirmTrue: false,
   protectData: false,
+  botcheck: false,
 };
 
 function validate(step, form) {
@@ -135,6 +136,8 @@ export default function ApplyAgent() {
         <p className="section-text">{HEADINGS[step].text}</p>
         <StepTabs steps={STEPS} current={step} />
         <form className="form-card" onSubmit={next} noValidate>
+          {/* Spam trap: hidden from people, so only bots tick it. */}
+          <input type="checkbox" checked={form.botcheck} onChange={set("botcheck")} tabIndex={-1} aria-hidden="true" style={{ display: "none" }} />
           {step === 0 ? (
             <>
               <div className="form-grid">
@@ -191,6 +194,7 @@ export default function ApplyAgent() {
                 <span>If approved, I agree to protect farmers' information and use it only for GrowLine.</span>
               </label>
               {errors.protectData ? <span className="error-text">{errors.protectData}</span> : null}
+              <p className="hint">Your application is sent to the GrowLine team by email through our form provider, Web3Forms.</p>
             </div>
           ) : null}
 

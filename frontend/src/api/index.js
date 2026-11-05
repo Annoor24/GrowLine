@@ -3,6 +3,7 @@ import { ApiError, fetchAllPages, request, USE_MOCKS } from "./client.js";
 import { readSession } from "./session.js";
 import {
   activityRow,
+  applicationEmailFields,
   adminOverview,
   adminReports,
   smsAlertDetail,
@@ -629,6 +630,27 @@ export const api = {
     }),
   ),
 
-  // ---------- Agent application (no backend endpoint yet): accept and do nothing ----------
-  applyAgent: (payload) => delay({ ok: true, payload }),
+  // ---------- Agent application: emailed through Web3Forms (the inbox is set by the access key) ----------
+  applyAgent: live(
+    async (form) => {
+      const accessKey = import.meta.env.VITE_WEB3FORMS_KEY;
+      if (!accessKey) throw new Error("VITE_WEB3FORMS_KEY is not set");
+      const res = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          access_key: accessKey,
+          subject: `Extension agent application: ${form.name.trim()}`,
+          from_name: "GrowLine website",
+          replyto: form.email.trim(),
+          botcheck: form.botcheck,
+          ...applicationEmailFields(form),
+        }),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.success) throw new Error(result?.message || "The application could not be sent");
+      return result;
+    },
+    () => ({ success: true }),
+  ),
 };

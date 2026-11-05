@@ -543,6 +543,29 @@ export function adminReports(r) {
   };
 }
 
+// ----- agent application -----
+// The fields as they appear in the email the team receives.
+export const applicationEmailFields = (form) => ({
+  "Full name": form.name,
+  Phone: form.phone,
+  Email: form.email,
+  "Preferred contact": form.contactMethod,
+  "Applying as": form.applyingAs,
+  Organisation: form.organisation || "—",
+  Role: form.role || "—",
+  States: form.states.join(", "),
+  Areas: form.areas,
+  "Farmers they can reach": form.reach,
+  "How many grow tomatoes": form.tomatoShare,
+  "Experience with farmers": form.experience,
+  "How they reach farmers": form.howReach,
+  "Device with internet": form.device,
+  Motivation: form.motivation,
+  "Anything else": form.extra || "—",
+  "Confirmed information is true": form.confirmTrue ? "Yes" : "No",
+  "Agreed to protect farmers' data": form.protectData ? "Yes" : "No",
+});
+
 // ----- farmers -----
 export const farmerRow = (f) => ({
   id: f.id,
