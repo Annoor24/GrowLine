@@ -630,6 +630,12 @@ export const api = {
     }),
   ),
 
+  // The invited agent's first password. body: { uid, token, newPassword1, newPassword2 } (uid and token come from the link).
+  agentSetPassword: live(
+    (body) => request("/add-password/", { method: "POST", body, auth: false }),
+    () => ({ message: "Password added successfully." }),
+  ),
+
   // ---------- Agent application: emailed through Web3Forms (the inbox is set by the access key) ----------
   applyAgent: live(
     async (form) => {

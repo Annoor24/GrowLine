@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { api } from "../../api/index.js";
+import { ApiError, USE_MOCKS } from "../../api/client.js";
 import AuthShell from "../../layouts/AuthShell.jsx";
 import FormField from "../../components/FormField.jsx";
 import Button from "../../components/Button.jsx";
@@ -8,10 +10,6 @@ import { passwordMessage } from "../../utils/validate.js";
 import { describeLoginError } from "../../auth/loginErrors.js";
 
 const MIN_PASSWORD = 12;
-
-// MOCK: the agent's first name will come from the API using the link's token.
-// The design review removed the email field and the expiry time (the expiry is in the email).
-const SAMPLE_INVITATION = { firstName: "Fatima" };
 
 // MOCK: any email works; the password "wrong" simulates a failed login.
 export function AgentSignIn() {
@@ -94,23 +92,47 @@ export function InvitationExpired() {
   );
 }
 
+// The invitation email links to /set-password?uid=...&token=...
 export function AgentActivate() {
-  const { token } = useParams();
+  const { token: pathToken } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [expired, setExpired] = useState(false);
+  const uid = searchParams.get("uid");
+  const token = searchParams.get("token");
 
-  // MOCK: the link /activate/expired shows the expired screen.
-  if (token === "expired") return <InvitationExpired />;
+  // /activate/expired, a link missing its details, or one the backend has rejected.
+  if (pathToken === "expired" || expired || (!USE_MOCKS && (!uid || !token))) return <InvitationExpired />;
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const next = {};
     if (passwordMessage(password)) next.password = passwordMessage(password);
     if (password !== confirm) next.confirm = "The two passwords do not match.";
     setErrors(next);
-    if (Object.keys(next).length === 0) navigate("/activation-success");
+    if (Object.keys(next).length > 0) return;
+
+    setSaving(true);
+    try {
+      await api.agentSetPassword({ uid, token, newPassword1: password, newPassword2: confirm });
+      navigate("/activation-success");
+    } catch (err) {
+      const body = err instanceof ApiError && err.status === 400 ? err.data : null;
+      const first = (value) => (Array.isArray(value) ? String(value[0]) : value ? String(value) : "");
+      if (body?.token || body?.uid) {
+        setExpired(true);
+      } else {
+        const found = { password: first(body?.newPassword1), confirm: first(body?.newPassword2) };
+        if (!found.password && !found.confirm) found.form = "Your password could not be saved. Check your connection and try again.";
+        setErrors(found);
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -118,11 +140,12 @@ export function AgentActivate() {
       centered
       heading="Extension Agent · Activate Account"
       sub="Invitation-based first-time access."
-      title={`Welcome to GrowLine, ${SAMPLE_INVITATION.firstName}`}
+      title="Welcome to GrowLine"
       intro="Create your password to get started."
       footer="Activation links can only be used once."
     >
       <form className="stack" onSubmit={handleSubmit}>
+        {errors.form ? <p className="notice notice-danger">{errors.form}</p> : null}
         <FormField
           label="Create password"
           type="password"
@@ -140,7 +163,9 @@ export function AgentActivate() {
           onChange={(e) => setConfirm(e.target.value)}
           error={errors.confirm}
         />
-        <Button type="submit">Activate my account</Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Activating…" : "Activate my account"}
+        </Button>
       </form>
     </AuthShell>
   );

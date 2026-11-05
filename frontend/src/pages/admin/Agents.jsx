@@ -241,7 +241,15 @@ export function AgentInvitations() {
     { key: "area", label: "Area" },
     { key: "invitation", label: "Invitation", render: (row) => <StatusPill>{row.invitation}</StatusPill> },
     { key: "sent", label: "Sent" },
-    { key: "action", label: "Action", render: (row) => <button type="button" className="link-button">{row.action}</button> },
+    {
+      key: "action",
+      label: "Action",
+      render: (row) => (
+        <Link className="link-button" to={`/admin/agents/${row.id}`}>
+          View agent
+        </Link>
+      ),
+    },
   ];
   return (
     <div className="stack">
@@ -323,7 +331,7 @@ export function CreateAgent() {
             <FormField label="Account status" value="Pending activation" readOnly />
           </div>
           <p className="notice notice-success">
-            <strong>Invitation policy.</strong> Single-use activation link · Expires in 48 hours · Agent sets their own password.
+            <strong>Invitation policy.</strong> Single-use activation link · Expires in 24 hours · Agent sets their own password.
           </p>
           <div className="form-actions">
             <Button type="submit" disabled={saving}>
