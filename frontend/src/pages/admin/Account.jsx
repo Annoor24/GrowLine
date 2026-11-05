@@ -88,28 +88,15 @@ export function AdminEditProfile() {
 export function AdminSettings() {
   return (
     <div className="stack">
-      <PageHeader bar="Super Admin" title="Personal Settings" subtitle="Manage your own security and alerts" />
+      <PageHeader bar="Super Admin" title="Settings" subtitle="Manage your account security" />
       <Card title="Security">
         <div className="row">
           <div style={{ flex: 1, minWidth: 220 }}>
             <FormField label="Password" type="password" value="••••••••" readOnly />
           </div>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <FormField label="Last password update" value="Not available" readOnly />
-          </div>
           <Button as={Link} to="/admin/settings/password">
             Change password
           </Button>
-        </div>
-      </Card>
-      <Card title="Alerts and sessions">
-        <div className="form-grid">
-          <FormField label="Admin notifications" value="Enabled" readOnly />
-          <FormField label="Email alerts" value="Enabled" readOnly />
-          <FormField label="Active sessions" value="View and sign out" readOnly />
-        </div>
-        <div className="form-actions">
-          <Button>Save preferences</Button>
         </div>
       </Card>
     </div>
