@@ -9,6 +9,7 @@ import Card from "../../components/Card.jsx";
 import DataTable from "../../components/DataTable.jsx";
 import FormField from "../../components/FormField.jsx";
 import Loading from "../../components/Loading.jsx";
+import Modal from "../../components/Modal.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import StatusPill from "../../components/StatusPill.jsx";
 
@@ -24,16 +25,21 @@ export function AdminAgents() {
     {
       key: "action",
       label: "Action",
-      render: (row) =>
-        row.status === "Inactive" ? (
-          <button type="button" className="link-button" onClick={() => navigate(`/admin/agents/${row.id}/security`)}>
-            Activate
-          </button>
-        ) : (
+      render: (row) => (
+        <span>
           <button type="button" className="link-button" onClick={() => navigate(`/admin/agents/${row.id}`)}>
             View / Edit
           </button>
-        ),
+          {row.status === "Inactive" ? (
+            <>
+              {" | "}
+              <button type="button" className="link-button" onClick={() => navigate(`/admin/agents/${row.id}/security`)}>
+                Activate
+              </button>
+            </>
+          ) : null}
+        </span>
+      ),
     },
   ];
   return (
@@ -103,28 +109,27 @@ export function AdminAgentProfile() {
   );
 }
 
-// NOT IN THE DESIGN: requested in review comment #15. Assign or unassign farmers for one agent,
-// including farmers who registered themselves on the website and have no agent yet.
-// Changes are kept on this page only until the backend has an assignment endpoint.
+// NOT IN THE DESIGN: requested in review comment #15. Assign farmers to one agent or move them to
+// another, including farmers who registered themselves on the website and have no agent yet.
+// The backend has no unassign and no bulk endpoint, so each farmer is one request.
 export function AssignFarmers() {
   const { id } = useParams();
   const { data: agent, loading, error, reload } = useAsync(() => api.adminAgentDetail(id), [id]);
-  const farmers = useAsync(api.adminFarmerAssignments);
-  const agents = useAsync(api.adminAgents);
-  const [changes, setChanges] = useState({});
+  const assignments = useAsync(api.adminFarmerAssignments);
   const [picked, setPicked] = useState({ assigned: [], unassigned: [] });
   const [moveTo, setMoveTo] = useState("");
   const [notice, setNotice] = useState("");
+  const [problem, setProblem] = useState("");
+  const [saving, setSaving] = useState(false);
 
   if (loading || !agent) return <Loading error={error} onRetry={reload} />;
-  if (farmers.loading || !farmers.data) return <Loading error={farmers.error} onRetry={farmers.reload} />;
+  if (!assignments.data) return <Loading error={assignments.error} onRetry={assignments.reload} />;
 
-  // The sample assignments use the sample agent IDs; the agent on this page is matched by its code.
-  const agentKey = agent.code;
-  const rows = farmers.data.map((f) => ({ ...f, agentId: f.id in changes ? changes[f.id] : f.agentId }));
-  const assigned = rows.filter((f) => f.agentId === agentKey);
-  const unassigned = rows.filter((f) => !f.agentId);
-  const otherAgents = (agents.data || []).filter((a) => a.id !== agentKey && a.status !== "Inactive");
+  const { farmers, agents } = assignments.data;
+  const assigned = farmers.filter((f) => f.agentCode === agent.code);
+  const unassigned = farmers.filter((f) => !f.agentCode);
+  const otherAgents = agents.filter((a) => a.code !== agent.code && a.status !== "Inactive");
+  const agentInactive = agent.status === "Inactive";
 
   const toggle = (list, farmerId) => {
     const current = picked[list];
@@ -132,14 +137,34 @@ export function AssignFarmers() {
     setPicked({ ...picked, [list]: next });
   };
 
-  function apply(ids, newAgentId, message) {
-    const next = { ...changes };
-    ids.forEach((farmerId) => {
-      next[farmerId] = newAgentId;
-    });
-    setChanges(next);
+  const count = (n) => `${n} farmer${n === 1 ? "" : "s"}`;
+  const reason = (err) => {
+    const body = err instanceof ApiError ? err.data : null;
+    const text = body?.agent_code || body?.farmer_code || body?.message;
+    return Array.isArray(text) ? text[0] : text || "the change could not be saved";
+  };
+
+  // One request per farmer, one after another, so a failure only affects that farmer.
+  async function assignTo(codes, target) {
+    setSaving(true);
+    setNotice("");
+    setProblem("");
+    const failed = [];
+    for (const code of codes) {
+      try {
+        await api.adminReassignFarmer(code, target.code);
+      } catch (err) {
+        failed.push(`${code}: ${reason(err)}`);
+      }
+    }
     setPicked({ assigned: [], unassigned: [] });
-    setNotice(message);
+    setMoveTo("");
+    setSaving(false);
+    const done = codes.length - failed.length;
+    if (done > 0) setNotice(`${count(done)} assigned to ${target.name}. Their farms moved with them.`);
+    if (failed.length > 0) setProblem(`Not saved: ${failed.join("; ")}`);
+    assignments.reload();
+    reload();
   }
 
   const checkColumn = (list) => ({
@@ -158,67 +183,49 @@ export function AssignFarmers() {
     { key: "id", label: "Farmer ID" },
     { key: "name", label: "Farmer" },
     { key: "farms", label: "Farms" },
-    { key: "location", label: "LGA" },
+    { key: "location", label: "Location" },
   ];
-  const sourceColumn = {
-    key: "source",
-    label: "Registered by",
-    render: (row) => <StatusPill tone={row.source === "Website" ? "info" : "neutral"}>{row.source === "Website" ? "Self (website)" : "Agent"}</StatusPill>,
-  };
-
-  const count = (n) => `${n} farmer${n === 1 ? "" : "s"}`;
-  const movingAgent = otherAgents.find((a) => a.id === moveTo);
+  const movingAgent = otherAgents.find((a) => a.code === moveTo);
 
   return (
     <div className="stack">
-      <PageHeader bar="Admin" title="Assign farmers" subtitle={`Assign or unassign farmers for ${agent.name} (${agent.code})`} />
+      <PageHeader bar="Admin" title="Assign farmers" subtitle={`Assign or move farmers for ${agent.name} (${agent.code})`} />
       <div>
         <Button variant="secondary" as={Link} to={`/admin/agents/${agent.id}`}>
           ‹ Back to agent profile
         </Button>
       </div>
       {notice ? <p className="notice notice-success">{notice}</p> : null}
+      {problem ? <p className="notice notice-danger">{problem}</p> : null}
+      {agentInactive ? (
+        <p className="notice notice-warning">
+          This agent's account is not active, so farmers can't be assigned to them until it is activated.
+        </p>
+      ) : null}
 
-      <Card title={`Assigned to ${agent.name}`} subtitle="Select farmers to unassign or move to another agent">
+      <Card title={`Assigned to ${agent.name}`} subtitle="Select farmers to move to another agent">
         <DataTable columns={[checkColumn("assigned"), ...baseColumns]} rows={assigned} empty="No farmers are assigned to this agent." />
         <div className="form-actions" style={{ alignItems: "flex-end" }}>
-          <Button
-            variant="secondary"
-            disabled={picked.assigned.length === 0}
-            onClick={() => apply(picked.assigned, null, `${count(picked.assigned.length)} unassigned from ${agent.name}.`)}
-          >
-            Unassign selected
-          </Button>
           <div style={{ minWidth: 220 }}>
             <FormField
               label="Move to agent"
               kind="select"
               value={moveTo}
               onChange={(e) => setMoveTo(e.target.value)}
-              options={[{ value: "", label: "Choose an agent" }, ...otherAgents.map((a) => ({ value: a.id, label: a.name }))]}
+              options={[{ value: "", label: "Choose an agent" }, ...otherAgents.map((a) => ({ value: a.code, label: a.name }))]}
             />
           </div>
-          <Button
-            disabled={picked.assigned.length === 0 || !movingAgent}
-            onClick={() => apply(picked.assigned, moveTo, `${count(picked.assigned.length)} moved to ${movingAgent.name}.`)}
-          >
-            Move selected
+          <Button disabled={saving || picked.assigned.length === 0 || !movingAgent} onClick={() => assignTo(picked.assigned, movingAgent)}>
+            {saving ? "Saving…" : "Move selected"}
           </Button>
         </div>
       </Card>
 
       <Card title="Farmers without an agent" subtitle="Includes farmers who registered themselves on the website">
-        <DataTable
-          columns={[checkColumn("unassigned"), ...baseColumns, sourceColumn]}
-          rows={unassigned}
-          empty="Every farmer has an agent."
-        />
+        <DataTable columns={[checkColumn("unassigned"), ...baseColumns]} rows={unassigned} empty="Every farmer has an agent." />
         <div className="form-actions">
-          <Button
-            disabled={picked.unassigned.length === 0}
-            onClick={() => apply(picked.unassigned, agentKey, `${count(picked.unassigned.length)} assigned to ${agent.name}.`)}
-          >
-            Assign selected to {agent.name}
+          <Button disabled={saving || agentInactive || picked.unassigned.length === 0} onClick={() => assignTo(picked.unassigned, agent)}>
+            {saving ? "Saving…" : `Assign selected to ${agent.name}`}
           </Button>
         </div>
       </Card>
@@ -334,35 +341,86 @@ export function CreateAgent() {
 
 export function AgentSecurity() {
   const { id } = useParams();
-  const { data, loading, error, reload } = useAsync(api.adminAgents);
-  const [sent, setSent] = useState(false);
-  if (loading || !data) return <Loading error={error} onRetry={reload} />;
-  const agent = data.find((item) => String(item.id) === id);
-  if (!agent) return <p className="notice notice-warning">Agent not found.</p>;
+  const { data: agent, loading, error, reload } = useAsync(() => api.adminAgentDetail(id), [id]);
+  const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [problem, setProblem] = useState("");
+  if (loading || !agent) return <Loading error={error} onRetry={reload} />;
+  const active = agent.status !== "Inactive";
+
+  async function setActive(next) {
+    setConfirming(false);
+    setSaving(true);
+    setNotice("");
+    setProblem("");
+    try {
+      await api.adminSetAgentActive(agent.code, next);
+      setNotice(next ? "Account activated." : "Account deactivated. This agent can no longer sign in.");
+      reload();
+    } catch (err) {
+      setProblem((err instanceof ApiError && err.data?.message) || "The account could not be updated. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="stack">
       <PageHeader bar="Admin" title="Agent Account & Password Reset" subtitle="Control agent account access safely" />
+      <div>
+        <Button variant="secondary" as={Link} to={`/admin/agents/${agent.id}`}>
+          ‹ Back to agent profile
+        </Button>
+      </div>
+      {notice ? <p className="notice notice-success">{notice}</p> : null}
+      {problem ? <p className="notice notice-danger">{problem}</p> : null}
       <Card title="Agent account">
         <div className="form-grid">
           <FormField label="Agent" value={agent.name} readOnly />
-          <FormField label="Agent ID" value={agent.id} readOnly />
+          <FormField label="Agent ID" value={agent.code} readOnly />
           <FormField label="Account status" value={agent.status} readOnly />
-          <FormField label="Last sign in" value="View audit log" readOnly />
         </div>
         <div className="form-actions">
-          <Button>Update account</Button>
+          {active ? (
+            <Button variant="secondary" disabled={saving} onClick={() => setConfirming(true)}>
+              Deactivate account
+            </Button>
+          ) : (
+            <Button disabled={saving} onClick={() => setActive(true)}>
+              {saving ? "Activating…" : "Activate account"}
+            </Button>
+          )}
         </div>
       </Card>
       <Card title="Password reset">
-        {sent ? <p className="notice notice-success">Reset link sent to the agent's registered email.</p> : null}
-        <div className="form-grid" style={{ marginTop: sent ? 12 : 0 }}>
+        <div className="form-grid">
           <FormField label="Reset method" value="Send secure reset link" readOnly />
           <FormField label="Delivery channel" value="Registered email address" readOnly />
         </div>
+        <p className="hint" style={{ marginTop: 12 }}>
+          Sending a reset link is not available yet.
+        </p>
         <div className="form-actions">
-          <Button onClick={() => setSent(true)}>Send reset link</Button>
+          <Button disabled>Send reset link</Button>
         </div>
       </Card>
+
+      <Modal
+        open={confirming}
+        title="Deactivate this account?"
+        onClose={() => setConfirming(false)}
+        actions={[
+          <Button key="cancel" variant="secondary" onClick={() => setConfirming(false)}>
+            Cancel
+          </Button>,
+          <Button key="confirm" onClick={() => setActive(false)}>
+            Deactivate
+          </Button>,
+        ]}
+      >
+        <p>{agent.name} will no longer be able to sign in. You can activate the account again later.</p>
+      </Modal>
     </div>
   );
 }

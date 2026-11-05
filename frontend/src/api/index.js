@@ -282,7 +282,42 @@ export const api = {
 
   // ---------- Not connected yet (no backend endpoint): always sample data ----------
   adminOverview: live(async () => adminOverview(await request("/superadmin/overview/")), () => data.adminOverview),
-  adminFarmerAssignments: sample(data.adminFarmerAssignments),
+  // The farmer list does not say who a farmer's agent is, but each agent's details list their farmers.
+  adminFarmerAssignments: live(
+    async () => {
+      const [list, { rows }] = await Promise.all([request("/superadmin/agent-list/"), fetchAllPages("/superadmin/farmers/?page_size=100")]);
+      const details = await Promise.all(list.map((a) => request(`/superadmin/agent/${a.id}/`).then(agentDetail)));
+      const owners = {};
+      details.forEach((agent) => agent.farmerList.forEach((farmer) => { owners[farmer.code] = agent.code; }));
+      return {
+        farmers: rows.map(farmerRow).map((f) => ({ id: f.code, name: f.name, farms: f.farms, location: f.location, agentCode: owners[f.code] || null })),
+        agents: details.map((a) => ({ id: a.id, code: a.code, name: a.name, status: a.status })),
+      };
+    },
+    () => ({
+      farmers: data.adminFarmerAssignments.map((f) => ({ ...f, agentCode: f.agentId })),
+      agents: data.adminAgents.map((a) => ({ id: a.id, code: a.id, name: a.name, status: a.status })),
+    }),
+  ),
+  // Assigns or moves one farmer; there is no bulk endpoint. Their farms move with them.
+  adminReassignFarmer: live(
+    async (farmerCode, agentCode) =>
+      unwrap(await request("/superadmin/farmers/reassign/", { method: "POST", body: { farmer_code: farmerCode, agent_code: agentCode } })),
+    (farmerCode, agentCode) => {
+      const farmer = data.adminFarmerAssignments.find((f) => f.id === farmerCode);
+      if (!farmer) throw new ApiError(400, { farmer_code: ["Farmer not found."] });
+      farmer.agentId = agentCode;
+      return { agent_code: agentCode, farms_moved: farmer.farms };
+    },
+  ),
+  // active: true to reactivate the agent's account, false to deactivate it.
+  adminSetAgentActive: live(
+    (agentCode, active) => request(`/superadmin/${active ? "activate" : "deactivate"}/agent/${encodeURIComponent(agentCode)}/`, { method: "POST" }),
+    (agentCode, active) => {
+      Object.assign(data.adminAgents.find((a) => a.id === agentCode), { status: active ? "Active" : "Inactive" });
+      return { message: "Done." };
+    },
+  ),
   // GET /user/ has no email or admin ID, so the email comes from the login.
   adminProfile: live(
     async () => ({ ...userProfile(await request("/user/")), email: readSession()?.email || "", adminId: "" }),

@@ -10,6 +10,7 @@ const CONNECTED_PAGES = [
   /^\/admin\/sms(\/[^/]+)?$/,
   /^\/admin\/reports$/,
   /^\/admin\/settings$/,
+  /^\/admin\/agents\/\d+\/(assign|security)$/,
   /^\/admin\/agents$/,
   /^\/admin\/agents\/(invitations|new)$/,
   /^\/admin\/agents\/\d+$/,
